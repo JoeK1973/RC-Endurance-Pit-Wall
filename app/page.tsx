@@ -904,7 +904,7 @@ export default function Home() {
 
   /*
    * Add driver to queue.
-   * Duplicate entries allowed.
+   * Duplicate entries are allowed.
    */
   const addQueue =
     async (
@@ -913,14 +913,24 @@ export default function Home() {
       const currentSession =
         session;
 
-      if (!currentSession) {
-        return;
-      }
-
       const db =
         supabase.current;
 
-      if (!db) return;
+      if (!currentSession) {
+        setMessage(
+          "No active session."
+        );
+        return;
+      }
+
+      if (!db) {
+        setMessage(
+          "Supabase is not configured."
+        );
+        return;
+      }
+
+      setMessage("");
 
       const highestPosition =
         queue.reduce(
@@ -935,23 +945,61 @@ export default function Home() {
           0
         );
 
-      const { error } =
-        await db
-          .from("driver_queue")
-          .insert({
-            session_id:
-              currentSession.id,
-            driver_id:
-              driverId,
-            position:
-              highestPosition + 1,
-          });
+      const {
+        data,
+        error,
+      } = await db
+        .from("driver_queue")
+        .insert({
+          session_id:
+            currentSession.id,
+          driver_id:
+            driverId,
+          position:
+            highestPosition + 1,
+        })
+        .select(
+          "id, driver_id, position"
+        )
+        .single();
 
       if (error) {
-        setMessage(
-          error.message
+        console.error(
+          "Could not add driver to queue:",
+          error
         );
+
+        setMessage(
+          `Could not add driver to queue: ${error.message}`
+        );
+        return;
       }
+
+      if (!data) {
+        setMessage(
+          "Queue entry was not returned after saving."
+        );
+        return;
+      }
+
+      /*
+       * Update this device immediately.
+       * This does not depend on Supabase Realtime.
+       */
+      setQueue(
+        (currentQueue) => [
+          ...currentQueue,
+          data as QueueItem,
+        ]
+      );
+
+      /*
+       * Refresh from Supabase so all devices
+       * eventually have exactly the same queue.
+       */
+      await loadSession(
+        currentSession.session_code
+      );
     };
 
   /*
@@ -961,10 +1009,17 @@ export default function Home() {
     async (
       queueItemId: string
     ) => {
+      const currentSession =
+        session;
+
       const db =
         supabase.current;
 
-      if (!db) return;
+      if (!currentSession || !db) {
+        return;
+      }
+
+      setMessage("");
 
       const { error } =
         await db
@@ -976,10 +1031,29 @@ export default function Home() {
           );
 
       if (error) {
-        setMessage(
-          error.message
+        console.error(
+          "Could not remove queue entry:",
+          error
         );
+
+        setMessage(
+          `Could not remove queue entry: ${error.message}`
+        );
+        return;
       }
+
+      setQueue(
+        (currentQueue) =>
+          currentQueue.filter(
+            (item) =>
+              item.id !==
+              queueItemId
+          )
+      );
+
+      await loadSession(
+        currentSession.session_code
+      );
     };
 
   /*
