@@ -901,17 +901,6 @@ export default function Home() {
         return;
       }
 
-      /*
-       * Keep the timer responsive immediately. The elapsed-time
-       * calculation reads from local `race`, so do not wait for
-       * a Supabase refresh or Realtime event after Start/Pause/Reset.
-       */
-      setRace({
-        ...race,
-        ...updates,
-      });
-
-      setMessage("");
     };
 
   /*
