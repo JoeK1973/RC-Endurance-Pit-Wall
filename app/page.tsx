@@ -702,27 +702,22 @@ export default function Home() {
    */
   const addDriver =
     async () => {
-      const currentSession =
-        session;
+      const currentSession = session;
+      const name = newDriver.trim();
+      const db = supabase.current;
 
-      const currentRace =
-        race;
-
-      const name =
-        newDriver.trim();
-
-      if (
-        !currentSession ||
-        !currentRace ||
-        !name
-      ) {
+      if (!currentSession || !name) {
         return;
       }
 
-      const db =
-        supabase.current;
+      if (!db) {
+        setMessage(
+          "Supabase is not configured."
+        );
+        return;
+      }
 
-      if (!db) return;
+      setMessage("");
 
       const {
         data,
@@ -730,29 +725,63 @@ export default function Home() {
       } = await db
         .from("drivers")
         .insert({
-          session_id:
-            currentSession.id,
+          session_id: currentSession.id,
           name,
         })
         .select()
         .single();
 
       if (error) {
+        console.error(
+          "Could not add driver:",
+          error
+        );
+
         setMessage(
-          error.message
+          `Could not save driver: ${error.message}`
         );
         return;
       }
 
-      if (!data) return;
+      if (!data) {
+        setMessage(
+          "Driver was not returned after saving."
+        );
+        return;
+      }
+
+      /*
+       * Update this device immediately.
+       * This means adding a driver does not
+       * depend on Supabase Realtime being enabled.
+       */
+      setDrivers((currentDrivers) => {
+        if (
+          currentDrivers.some(
+            (driver) =>
+              driver.id === data.id
+          )
+        ) {
+          return currentDrivers;
+        }
+
+        return [
+          ...currentDrivers,
+          data as Driver,
+        ];
+      });
 
       setNewDriver("");
 
+      const currentRace = race;
+
       /*
-       * First driver becomes
-       * current driver.
+       * Make the first driver the current driver.
+       * If driver_stints is unavailable or fails,
+       * the driver itself is still kept.
        */
       if (
+        currentRace &&
         !currentRace.current_driver_id
       ) {
         const nowIso =
@@ -775,30 +804,63 @@ export default function Home() {
           .single();
 
         if (stintError) {
+          console.error(
+            "Could not create first driver stint:",
+            stintError
+          );
+
           setMessage(
-            stintError.message
+            `Driver saved, but the first stint could not be created: ${stintError.message}`
           );
-          return;
+        } else {
+          const { error: raceError } =
+            await db
+              .from("races")
+              .update({
+                current_driver_id:
+                  data.id,
+                current_stint_started_at:
+                  nowIso,
+                active_stint_id:
+                  newStint?.id ??
+                  null,
+              })
+              .eq(
+                "id",
+                currentRace.id
+              );
+
+          if (raceError) {
+            console.error(
+              "Could not set current driver:",
+              raceError
+            );
+
+            setMessage(
+              `Driver saved, but could not set them as the current driver: ${raceError.message}`
+            );
+          } else {
+            setRace({
+              ...currentRace,
+              current_driver_id:
+                data.id,
+              current_stint_started_at:
+                nowIso,
+              active_stint_id:
+                newStint?.id ??
+                null,
+            });
+          }
         }
-
-        await db
-          .from("races")
-          .update({
-            current_driver_id:
-              data.id,
-
-            current_stint_started_at:
-              nowIso,
-
-            active_stint_id:
-              newStint?.id ??
-              null,
-          })
-          .eq(
-            "id",
-            currentRace.id
-          );
       }
+
+      /*
+       * Refresh from Supabase so all devices
+       * converge even if Realtime is disabled.
+       */
+      await loadSession(
+        currentSession.session_code
+      );
     };
 
   /*
@@ -1482,25 +1544,6 @@ export default function Home() {
             }
           );
 
-        const contentType =
-          response.headers.get("content-type") ?? "";
-
-        if (
-          !contentType.includes("application/json")
-        ) {
-          const text =
-            await response.text();
-
-          console.error(
-            "RC-Results API returned non-JSON:",
-            text
-          );
-
-          throw new Error(
-            "The RC-Results API route returned HTML instead of JSON. Check that app/api/rc-results/route.ts exists and has deployed successfully."
-          );
-        }
-
         const data =
           await response.json();
 
@@ -1706,25 +1749,6 @@ export default function Home() {
                   "no-store",
               }
             );
-
-          const contentType =
-            response.headers.get("content-type") ?? "";
-
-          if (
-            !contentType.includes(
-              "application/json"
-            )
-          ) {
-            const text =
-              await response.text();
-
-            console.error(
-              "RC-Results polling returned non-JSON:",
-              text
-            );
-
-            return;
-          }
 
           const data =
             await response.json();
