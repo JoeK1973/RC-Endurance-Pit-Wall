@@ -23,495 +23,189 @@ const cleanText = (value: string) =>
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
-    .replace(/&#39;/g, "'")
+    .replace(/&#39;/gi, "'")
     .replace(/&quot;/gi, '"')
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
     .replace(/\s+/g, " ")
     .trim();
 
-/*
- * Parse either:
- *
- * 18.234
- * 1:18.234
- * 01:18.234
- * 1:02:18.234
- *
- * into seconds.
- */
-const parseTime = (
-  value: string | undefined
-): number | null => {
-  if (!value) {
-    return null;
+const headerKey = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const parseNumber = (value?: string) => {
+  if (!value) return null;
+  const match = value.replace(",", ".").match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : null;
+};
+
+const parseTime = (value?: string) => {
+  if (!value) return null;
+  const cleaned = value.trim().replace(",", ".");
+  if (!cleaned || cleaned === "--" || cleaned === "-") return null;
+
+  if (/^\d+(?:\.\d+)?$/.test(cleaned)) {
+    const seconds = Number(cleaned);
+    return Number.isFinite(seconds) ? seconds : null;
   }
 
-  const cleaned = value
-    .trim()
-    .replace(",", ".");
-
-  if (!cleaned) {
-    return null;
-  }
-
-  /*
-   * Plain seconds.
-   */
-  if (
-    /^\d+(?:\.\d+)?$/.test(cleaned)
-  ) {
-    const number =
-      Number(cleaned);
-
-    return Number.isFinite(number)
-      ? number
-      : null;
-  }
-
-  const parts =
-    cleaned
-      .split(":")
-      .map((part) =>
-        Number(part)
-      );
-
-  if (
-    parts.some(
-      (part) =>
-        !Number.isFinite(part)
-    )
-  ) {
-    return null;
-  }
+  const parts = cleaned.split(":").map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return null;
 
   if (parts.length === 2) {
-    return (
-      parts[0] * 60 +
-      parts[1]
-    );
+    return parts[0] * 60 + parts[1];
   }
 
   if (parts.length === 3) {
-    return (
-      parts[0] * 3600 +
-      parts[1] * 60 +
-      parts[2]
-    );
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
   }
 
   return null;
 };
 
-const parseNumber = (
-  value: string | undefined
-): number | null => {
-  if (!value) {
-    return null;
-  }
-
-  const match =
-    value
-      .replace(",", ".")
-      .match(
-        /-?\d+(?:\.\d+)?/
-      );
-
-  return match
-    ? Number(match[0])
-    : null;
+const parseResultLaps = (value?: string) => {
+  if (!value) return null;
+  const match = value.match(/^\s*(\d+)\s*\//);
+  return match ? Number(match[1]) : null;
 };
 
-/*
- * RC-Results commonly displays results in forms such as:
- *
- * 125 / 30:01.234
- * 125/30:01.234
- *
- * We only need the completed lap count here.
- */
-const parseResult = (
-  value: string | undefined
-) => {
-  if (!value) {
-    return {
-      laps: null,
-    };
-  }
+function extractRows(html: string): string[][] {
+  const rows: string[][] = [];
 
-  const match =
-    value.match(
-      /^\s*(\d+)\s*\//
-    );
+  for (const rowMatch of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells: string[] = [];
 
-  return {
-    laps: match
-      ? Number(match[1])
-      : null,
-  };
-};
-
-function extractRows(
-  html: string
-): string[][] {
-  const rows: string[][] =
-    [];
-
-  const rowMatches =
-    html.matchAll(
-      /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi
-    );
-
-  for (
-    const rowMatch
-    of rowMatches
-  ) {
-    const cells: string[] =
-      [];
-
-    const cellMatches =
-      rowMatch[1].matchAll(
-        /<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi
-      );
-
-    for (
-      const cellMatch
-      of cellMatches
-    ) {
-      cells.push(
-        cleanText(
-          cellMatch[2]
-        )
-      );
+    for (const cellMatch of rowMatch[1].matchAll(
+      /<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi
+    )) {
+      cells.push(cleanText(cellMatch[2]));
     }
 
-    if (
-      cells.length > 0
-    ) {
-      rows.push(cells);
-    }
+    if (cells.length > 0) rows.push(cells);
   }
 
   return rows;
 }
 
-function findHeaderRow(
-  rows: string[][]
-) {
-  return rows.findIndex(
-    (row) => {
-      const text =
-        row
-          .join(" ")
-          .toLowerCase();
+function parseTeams(html: string): LiveTeam[] {
+  const rows = extractRows(html);
 
-      return (
-        text.includes("car") &&
-        (
-          text.includes("driver") ||
-          text.includes("result")
-        )
-      );
-    }
-  );
-}
-
-function indexFor(
-  headers: string[],
-  names: string[]
-) {
-  return headers.findIndex(
-    (header) =>
-      names.some(
-        (name) =>
-          header === name ||
-          header.includes(name)
-      )
-  );
-}
-
-function parseTeams(
-  html: string
-): LiveTeam[] {
-  const rows =
-    extractRows(html);
-
-  const headerIndex =
-    findHeaderRow(rows);
-
-  if (
-    headerIndex === -1
-  ) {
-    return [];
-  }
-
-  const headers =
-    rows[headerIndex].map(
-      (header) =>
-        header
-          .toLowerCase()
-          .replace(
-            /\s+/g,
-            ""
-          )
+  const headerIndex = rows.findIndex((row) => {
+    const headers = row.map(headerKey);
+    return (
+      headers.includes("car") &&
+      headers.includes("driver") &&
+      headers.includes("result")
     );
+  });
 
-  const positionIndex =
-    indexFor(
-      headers,
-      [
-        "pos",
-        "position",
-      ]
-    );
+  if (headerIndex === -1) return [];
 
-  const carIndex =
-    indexFor(
-      headers,
-      [
-        "car",
-        "carno",
-        "number",
-      ]
-    );
+  const headers = rows[headerIndex].map(headerKey);
 
-  const driverIndex =
-    indexFor(
-      headers,
-      [
-        "driver",
-        "name",
-        "team",
-      ]
-    );
+  const indexOf = (...names: string[]) =>
+    headers.findIndex((header) => names.includes(header));
 
-  const resultIndex =
-    indexFor(
-      headers,
-      [
-        "result",
-      ]
-    );
+  const positionIndex = indexOf("pos", "position");
+  const carIndex = indexOf("car", "carno", "number");
+  const driverIndex = indexOf("driver", "name", "team");
+  const resultIndex = indexOf("result");
 
-  const lastLapIndex =
-    indexFor(
-      headers,
-      [
-        "last",
-        "lastlap",
-        "lap",
-      ]
-    );
+  /*
+   * Exact matching is important:
+   * "Best10" must not be selected when looking for "Best".
+   */
+  const bestIndex = indexOf("best", "bestlap");
+  const best10Index = indexOf("best10");
 
-  const bestIndex =
-    indexFor(
-      headers,
-      [
-        "best",
-        "bestlap",
-      ]
-    );
+  const teams: LiveTeam[] = [];
 
-  const averageIndex =
-    indexFor(
-      headers,
-      [
-        "best10",
-        "average",
-        "avg",
-      ]
-    );
+  for (let i = headerIndex + 1; i < rows.length; i += 1) {
+    const row = rows[i];
 
-  const teams: LiveTeam[] =
-    [];
-
-  for (
-    let rowIndex =
-      headerIndex + 1;
-
-    rowIndex <
-    rows.length;
-
-    rowIndex += 1
-  ) {
-    const row =
-      rows[rowIndex];
-
-    const rowText =
-      row
-        .join(" ")
-        .toLowerCase();
-
-    /*
-     * Stop when another results header
-     * starts.
-     */
-    if (
-      rowText.includes("pos") &&
-      rowText.includes("driver") &&
-      rowText.includes("car")
-    ) {
-      break;
-    }
-
-    const car =
-      carIndex >= 0
-        ? row[carIndex] ?? ""
-        : "";
-
+    const car = carIndex >= 0 ? row[carIndex] ?? "" : "";
     const driver =
-      driverIndex >= 0
-        ? row[driverIndex] ?? ""
-        : "";
-
+      driverIndex >= 0 ? row[driverIndex] ?? "" : "";
     const result =
-      resultIndex >= 0
-        ? row[resultIndex] ?? ""
-        : "";
+      resultIndex >= 0 ? row[resultIndex] ?? "" : "";
 
-    /*
-     * Ignore empty rows.
-     */
-    if (
-      !car &&
-      !driver &&
-      !result
-    ) {
-      continue;
-    }
+    if (!car && !driver && !result) continue;
 
-    const name =
-      driver ||
-      (
-        car
-          ? `Car ${car}`
-          : ""
-      );
+    const name = driver || (car ? `Car ${car}` : "");
 
-    /*
-     * Never accidentally return
-     * table headings as teams.
-     */
     if (
       !name ||
-      name.toLowerCase() ===
-        "car" ||
-      name.toLowerCase() ===
-        "driver" ||
-      name.toLowerCase() ===
-        "team"
+      ["car", "driver", "team"].includes(name.toLowerCase())
     ) {
       continue;
     }
-
-    const resultData =
-      parseResult(result);
-
-    const position =
-      positionIndex >= 0
-        ? parseNumber(
-            row[positionIndex]
-          )
-        : null;
-
-    const lastLap =
-      lastLapIndex >= 0
-        ? parseTime(
-            row[lastLapIndex]
-          )
-        : null;
-
-    const bestLap =
-      bestIndex >= 0
-        ? parseTime(
-            row[bestIndex]
-          )
-        : null;
-
-    const averageLap =
-      averageIndex >= 0
-        ? parseTime(
-            row[averageIndex]
-          )
-        : null;
 
     teams.push({
       name,
-      position,
-      laps:
-        resultData.laps,
-      lastLap,
-      bestLap,
-      averageLap,
+      position:
+        positionIndex >= 0
+          ? parseNumber(row[positionIndex])
+          : null,
+      laps: parseResultLaps(result),
+
+      /*
+       * The supplied RC-Results table has no Last Lap column.
+       * Last Lap is therefore calculated in page.tsx from the
+       * newest captured lap.
+       */
+      lastLap: null,
+
+      /*
+       * Correctly read the "Best" column, not "Best10".
+       */
+      bestLap:
+        bestIndex >= 0
+          ? parseTime(row[bestIndex])
+          : null,
+
+      /*
+       * Best10 is kept as a fallback. The dashboard calculates
+       * its displayed average from all captured lap times.
+       */
+      averageLap:
+        best10Index >= 0
+          ? parseTime(row[best10Index])
+          : null,
     });
   }
 
-  /*
-   * Remove duplicate teams.
-   */
   return Array.from(
     new Map(
-      teams.map(
-        (team) => [
-          team.name
-            .toLowerCase(),
-          team,
-        ]
-      )
+      teams.map((team) => [team.name.toLowerCase(), team])
     ).values()
   );
 }
 
-export async function GET(
-  request: NextRequest
-) {
-  const raceUrl =
-    request.nextUrl.searchParams
-      .get("url")
-      ?.trim();
-
+export async function GET(request: NextRequest) {
+  const raceUrl = request.nextUrl.searchParams.get("url")?.trim();
   const requestedTeam =
-    request.nextUrl.searchParams
-      .get("team")
-      ?.trim();
+    request.nextUrl.searchParams.get("team")?.trim();
 
   if (!raceUrl) {
     return NextResponse.json(
-      {
-        error:
-          "Missing RC-Results URL.",
-      },
-      {
-        status: 400,
-      }
+      { error: "Missing RC-Results URL." },
+      { status: 400 }
     );
   }
 
   let parsedUrl: URL;
 
   try {
-    parsedUrl =
-      new URL(raceUrl);
+    parsedUrl = new URL(raceUrl);
   } catch {
     return NextResponse.json(
-      {
-        error:
-          "The RC-Results URL is invalid.",
-      },
-      {
-        status: 400,
-      }
+      { error: "The RC-Results URL is invalid." },
+      { status: 400 }
     );
   }
 
   if (
-    parsedUrl.protocol !==
-      "https:" ||
-    !(
-      parsedUrl.hostname ===
-        "rc-results.com" ||
-      parsedUrl.hostname ===
-        "www.rc-results.com"
+    parsedUrl.protocol !== "https:" ||
+    !["rc-results.com", "www.rc-results.com"].includes(
+      parsedUrl.hostname
     )
   ) {
     return NextResponse.json(
@@ -519,49 +213,30 @@ export async function GET(
         error:
           "Please use an https://rc-results.com live race URL.",
       },
-      {
-        status: 400,
-      }
+      { status: 400 }
     );
   }
 
   try {
-    const response =
-      await fetch(
-        parsedUrl.toString(),
-        {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (compatible; RC-Endurance-Dashboard/1.0)",
-            Accept:
-              "text/html,application/xhtml+xml",
-          },
-          cache:
-            "no-store",
-        }
-      );
+    const response = await fetch(parsedUrl.toString(), {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; RC-Endurance-Dashboard/1.0)",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      cache: "no-store",
+    });
 
     if (!response.ok) {
       return NextResponse.json(
-        {
-          error:
-            `RC-Results returned ${response.status}.`,
-        },
-        {
-          status: 502,
-        }
+        { error: `RC-Results returned ${response.status}.` },
+        { status: 502 }
       );
     }
 
-    const html =
-      await response.text();
+    const html = await response.text();
+    const teams = parseTeams(html);
 
-    const teams =
-      parseTeams(html);
-
-    /*
-     * FIND TEAMS request.
-     */
     if (!requestedTeam) {
       return NextResponse.json(
         {
@@ -569,84 +244,51 @@ export async function GET(
           message:
             teams.length > 0
               ? undefined
-              : "No live race rows were found. Make sure the race is currently available on RC-Results.",
+              : "No live race rows were found.",
         },
         {
           headers: {
-            "Cache-Control":
-              "no-store, max-age=0",
+            "Cache-Control": "no-store, max-age=0",
           },
         }
       );
     }
 
-    /*
-     * Find the selected team.
-     */
+    const requested = requestedTeam.toLowerCase();
+
     const team =
       teams.find(
-        (item) =>
-          item.name
-            .toLowerCase()
-            .trim() ===
-          requestedTeam
-            .toLowerCase()
-            .trim()
+        (item) => item.name.toLowerCase() === requested
       ) ??
       teams.find(
         (item) =>
-          item.name
-            .toLowerCase()
-            .includes(
-              requestedTeam
-                .toLowerCase()
-                .trim()
-            )
+          item.name.toLowerCase().includes(requested)
       );
 
     if (!team) {
       return NextResponse.json(
         {
-          error:
-            `Could not find "${requestedTeam}" in the current RC-Results data.`,
+          error: `Could not find "${requestedTeam}" in the current RC-Results data.`,
           teams,
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
     /*
-     * IMPORTANT:
-     *
-     * RC-Results live pages provide a live total
-     * and last-lap value in the results table.
-     *
-     * We turn the CURRENT completed lap into a lap
-     * object. The dashboard already remembers lap
-     * numbers it has saved, so on the next poll:
-     *
-     * Lap 120 -> saved
-     * Lap 120 -> ignored
-     * Lap 121 -> saved
-     *
-     * This lets the dashboard track every newly
-     * completed lap while polling.
+     * Individual laps are supplied by any live-lap field that
+     * the source exposes. For this table, the page-level tracker
+     * calculates Last/Best/Average from captured laps.
      */
     const lapData: LiveLap[] =
-      (
-        team.laps !== null &&
-        team.laps > 0 &&
-        team.lastLap !== null &&
-        team.lastLap > 0
-      )
+      team.laps !== null &&
+      team.laps > 0 &&
+      team.lastLap !== null &&
+      team.lastLap > 0
         ? [
             {
-              lapNumber:
-                team.laps,
-              lapTime:
-                team.lastLap,
+              lapNumber: team.laps,
+              lapTime: team.lastLap,
             },
           ]
         : [];
@@ -659,16 +301,12 @@ export async function GET(
       },
       {
         headers: {
-          "Cache-Control":
-            "no-store, max-age=0",
+          "Cache-Control": "no-store, max-age=0",
         },
       }
     );
   } catch (error) {
-    console.error(
-      "RC-Results fetch failed:",
-      error
-    );
+    console.error("RC-Results fetch failed:", error);
 
     return NextResponse.json(
       {
@@ -677,9 +315,7 @@ export async function GET(
             ? error.message
             : "Could not fetch live data from RC-Results.",
       },
-      {
-        status: 502,
-      }
+      { status: 502 }
     );
   }
 }
