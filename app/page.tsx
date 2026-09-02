@@ -72,6 +72,7 @@ type LiveTeam = {
   lastLap?: number | null;
   bestLap?: number | null;
   averageLap?: number | null;
+  resultTotal?: number | null;
   driverResultUrl?: string | null;
 };
 
@@ -224,6 +225,11 @@ export default function Home() {
 
   const [raceLaps, setRaceLaps] =
     useState<RaceLap[]>([]);
+
+  /* Previous RC-Results Result value. This lets us calculate
+   * the latest lap as: current total - previous total. */
+  const previousResultRef =
+    useRef<{ laps: number; total: number } | null>(null);
 
   const [rcResultsUrl, setRcResultsUrl] =
     useState("");
@@ -1593,6 +1599,8 @@ export default function Home() {
         data
       );
 
+      previousResultRef.current = null;
+
       setMessage(
         `Now tracking ${selectedTeamName}.`
       );
@@ -1642,6 +1650,7 @@ export default function Home() {
 
       setLiveTeam(null);
       setLiveLaps([]);
+      previousResultRef.current = null;
 
       setMessage(
         "RC-Results tracking stopped."
@@ -1742,37 +1751,85 @@ export default function Home() {
             );
           }
 
-          const incomingLaps: LiveLap[] =
-            Array.isArray(
-              data.lapData
-            )
+          let incomingLaps: LiveLap[] =
+            Array.isArray(data.lapData)
               ? data.lapData
-                  .map(
-                    (
-                      lap: LiveLap
-                    ) => ({
-                      lapNumber:
-                        Number(
-                          lap.lapNumber
-                        ),
-                      lapTime:
-                        Number(
-                          lap.lapTime
-                        ),
-                    })
-                  )
-                  .filter(
-                    (lap: LiveLap) =>
-                      Number.isFinite(
-                        lap.lapNumber
-                      ) &&
-                      lap.lapNumber > 0 &&
-                      Number.isFinite(
-                        lap.lapTime
-                      ) &&
-                      lap.lapTime > 0
+                  .map((lap: LiveLap) => ({
+                    lapNumber: Number(lap.lapNumber),
+                    lapTime: Number(lap.lapTime),
+                  }))
+                  .filter((lap: LiveLap) =>
+                    Number.isFinite(lap.lapNumber) &&
+                    lap.lapNumber > 0 &&
+                    Number.isFinite(lap.lapTime) &&
+                    lap.lapTime > 0
                   )
               : [];
+
+          /*
+           * RC-Results supplies Result as LAP_COUNT / TOTAL_TIME.
+           * Example: 9 / 135.12 -> 10 / 150.15 gives a 15.03 lap.
+           * The first poll is only used as a baseline; no historical
+           * lap is invented.
+           */
+          if (
+            incomingLaps.length === 0 &&
+            data.team
+          ) {
+            const currentLaps = Number(data.team.laps);
+            const currentTotal = Number(data.team.resultTotal);
+
+            if (
+              Number.isFinite(currentLaps) &&
+              currentLaps >= 0 &&
+              Number.isFinite(currentTotal) &&
+              currentTotal >= 0
+            ) {
+              const previous = previousResultRef.current;
+
+              if (!previous) {
+                previousResultRef.current = {
+                  laps: currentLaps,
+                  total: currentTotal,
+                };
+              } else if (currentLaps === previous.laps + 1) {
+                const lapTime = currentTotal - previous.total;
+
+                previousResultRef.current = {
+                  laps: currentLaps,
+                  total: currentTotal,
+                };
+
+                if (
+                  Number.isFinite(lapTime) &&
+                  lapTime > 0
+                ) {
+                  incomingLaps = [{
+                    lapNumber: currentLaps,
+                    lapTime,
+                  }];
+                }
+              } else if (currentLaps > previous.laps) {
+                /* If polling misses more than one lap, update the
+                 * baseline rather than storing an incorrect combined lap. */
+                previousResultRef.current = {
+                  laps: currentLaps,
+                  total: currentTotal,
+                };
+              } else if (currentLaps < previous.laps) {
+                /* Race/restart/reset detected. */
+                previousResultRef.current = {
+                  laps: currentLaps,
+                  total: currentTotal,
+                };
+              } else {
+                previousResultRef.current = {
+                  laps: currentLaps,
+                  total: currentTotal,
+                };
+              }
+            }
+          }
 
           setLiveLaps(
             incomingLaps
