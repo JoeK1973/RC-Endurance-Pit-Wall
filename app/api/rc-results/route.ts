@@ -3,127 +3,59 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-type Team = {
+type LiveTeam = {
   name: string;
-  position?: number | null;
-  laps?: number | null;
-  lastLap?: number | null;
-  bestLap?: number | null;
-  averageLap?: number | null;
-  driverResultUrl?: string | null;
+  position: number | null;
+  laps: number | null;
+  lastLap: number | null;
+  bestLap: number | null;
+  averageLap: number | null;
 };
 
-type Lap = {
-  lapNumber: number;
-  lapTime: number;
-};
-
-function parseTime(value: string): number | null {
-  const text = value.trim().replace(",", ".");
-
-  if (!text) return null;
-
-  if (/^\d+(\.\d+)?$/.test(text)) {
-    return Number(text);
-  }
-
-  const parts = text.split(":");
-
-  if (parts.length === 2) {
-    const minutes = Number(parts[0]);
-    const seconds = Number(parts[1]);
-
-    if (
-      Number.isFinite(minutes) &&
-      Number.isFinite(seconds)
-    ) {
-      return minutes * 60 + seconds;
-    }
-  }
-
-  return null;
-}
-
-function clean(value: string): string {
-  return value
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
+const cleanText = (value: string) =>
+  value
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/gi, '"')
     .replace(/\s+/g, " ")
     .trim();
-}
 
-function absoluteUrl(
-  value: string,
-  base: string
-): string {
-  try {
-    return new URL(value, base).toString();
-  } catch {
-    return value;
-  }
-}
+const parseNumber = (value: string | undefined) => {
+  if (!value) return null;
 
-function extractDriverLinks(
-  html: string,
-  baseUrl: string
-): Team[] {
-  const teams: Team[] = [];
+  const match = value.replace(",", ".").match(/-?\d+(?:\.\d+)?/);
 
-  const regex =
-    /href=["']([^"']*DriverResult[^"']*driverId=(\d+)[^"']*)["'][^>]*>(.*?)<\/a>/gi;
+  return match ? Number(match[0]) : null;
+};
 
-  let match: RegExpExecArray | null;
+const parseResult = (value: string | undefined) => {
+  if (!value) return { laps: null, total: null };
 
-  while ((match = regex.exec(html))) {
-    const name = clean(match[3]);
+  const match = value.match(
+    /(\d+)\s*\/\s*(\d+(?:[.,]\d+)?)/
+  );
 
-    if (!name) continue;
+  return {
+    laps: match ? Number(match[1]) : null,
+    total: match ? Number(match[2].replace(",", ".")) : null,
+  };
+};
 
-    const url = absoluteUrl(
-      match[1],
-      baseUrl
+function extractRows(html: string): string[][] {
+  const rows: string[][] = [];
+  const rowMatches = html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi);
+
+  for (const rowMatch of rowMatches) {
+    const cells: string[] = [];
+    const cellMatches = rowMatch[1].matchAll(
+      /<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi
     );
 
-    if (
-      !teams.some(
-        (team) =>
-          team.name === name &&
-          team.driverResultUrl === url
-      )
-    ) {
-      teams.push({
-        name,
-        driverResultUrl: url,
-      });
-    }
-  }
-
-  return teams;
-}
-
-function extractTableRows(
-  html: string
-): string[][] {
-  const rows: string[][] = [];
-
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-
-  let rowMatch: RegExpExecArray | null;
-
-  while ((rowMatch = rowRegex.exec(html))) {
-    const cells: string[] = [];
-
-    const cellRegex =
-      /<(?:td|th)[^>]*>([\s\S]*?)<\/(?:td|th)>/gi;
-
-    let cellMatch: RegExpExecArray | null;
-
-    while (
-      (cellMatch =
-        cellRegex.exec(rowMatch[1]))
-    ) {
-      cells.push(clean(cellMatch[1]));
+    for (const cellMatch of cellMatches) {
+      cells.push(cleanText(cellMatch[2]));
     }
 
     if (cells.length > 0) {
@@ -134,155 +66,183 @@ function extractTableRows(
   return rows;
 }
 
-function extractTeamsFromTables(
-  html: string,
-  baseUrl: string
-): Team[] {
-  const teams: Team[] = [];
-  const rows = extractTableRows(html);
+function findHeaderRow(rows: string[][]) {
+  return rows.findIndex((row) => {
+    const text = row.join(" ").toLowerCase();
 
-  for (const cells of rows) {
-    if (cells.length < 2) continue;
+    return (
+      text.includes("car") &&
+      (text.includes("driver") || text.includes("result"))
+    );
+  });
+}
 
-    const positionText = cells[0];
-    const name = cells[1];
+function indexFor(headers: string[], names: string[]) {
+  return headers.findIndex((header) =>
+    names.some(
+      (name) =>
+        header === name ||
+        header.includes(name)
+    )
+  );
+}
 
-    if (!name || name.length < 2) {
+function parseTeams(html: string): LiveTeam[] {
+  const rows = extractRows(html);
+  const headerIndex = findHeaderRow(rows);
+
+  if (headerIndex === -1) {
+    return [];
+  }
+
+  const headers = rows[headerIndex].map((header) =>
+    header.toLowerCase().replace(/\s+/g, "")
+  );
+
+  const positionIndex = indexFor(headers, [
+    "pos",
+    "position",
+  ]);
+
+  const carIndex = indexFor(headers, [
+    "car",
+    "carno",
+    "number",
+  ]);
+
+  const driverIndex = indexFor(headers, [
+    "driver",
+    "name",
+    "team",
+  ]);
+
+  const resultIndex = indexFor(headers, [
+    "result",
+  ]);
+
+  const bestIndex = indexFor(headers, [
+    "best",
+  ]);
+
+  const best10Index = indexFor(headers, [
+    "best10",
+    "average",
+    "avg",
+  ]);
+
+  const teams: LiveTeam[] = [];
+
+  for (
+    let rowIndex = headerIndex + 1;
+    rowIndex < rows.length;
+    rowIndex += 1
+  ) {
+    const row = rows[rowIndex];
+
+    /*
+     * Stop at another table/header section.
+     */
+    if (
+      row.join(" ").toLowerCase().includes("pos") &&
+      row.join(" ").toLowerCase().includes("driver")
+    ) {
+      break;
+    }
+
+    const car =
+      carIndex >= 0
+        ? row[carIndex]
+        : "";
+
+    const driver =
+      driverIndex >= 0
+        ? row[driverIndex]
+        : "";
+
+    /*
+     * A valid live result row must have a car number,
+     * driver/team name, or a result.
+     *
+     * This deliberately rejects the header row "Car".
+     */
+    const result =
+      resultIndex >= 0
+        ? row[resultIndex]
+        : "";
+
+    if (
+      !car &&
+      !driver &&
+      !result
+    ) {
+      continue;
+    }
+
+    const resultData =
+      parseResult(result);
+
+    /*
+     * Prefer the actual Driver/Team field.
+     * If the meeting only supplies a car number, use that
+     * as a fallback rather than incorrectly returning "Car".
+     */
+    const name =
+      driver ||
+      (car ? `Car ${car}` : "");
+
+    if (
+      !name ||
+      name.toLowerCase() === "car" ||
+      name.toLowerCase() === "driver"
+    ) {
       continue;
     }
 
     const position =
-      /^\d+$/.test(positionText)
-        ? Number(positionText)
+      positionIndex >= 0
+        ? parseNumber(row[positionIndex])
         : null;
-
-    let laps: number | null = null;
-    let lastLap: number | null = null;
-    let bestLap: number | null = null;
-
-    for (const cell of cells.slice(2)) {
-      const resultMatch =
-        cell.match(/(\d+)\s*\/\s*[\d:.]+/);
-
-      if (resultMatch && laps === null) {
-        laps = Number(resultMatch[1]);
-      }
-
-      const time = parseTime(cell);
-
-      if (
-        time !== null &&
-        time > 0 &&
-        time < 3600
-      ) {
-        if (lastLap === null) {
-          lastLap = time;
-        } else if (
-          bestLap === null ||
-          time < bestLap
-        ) {
-          bestLap = time;
-        }
-      }
-    }
 
     teams.push({
       name,
       position,
-      laps,
-      lastLap,
-      bestLap,
-      driverResultUrl: null,
+      laps: resultData.laps,
+      lastLap: null,
+      bestLap:
+        bestIndex >= 0
+          ? parseNumber(row[bestIndex])
+          : null,
+      averageLap:
+        best10Index >= 0
+          ? parseNumber(row[best10Index])
+          : null,
     });
   }
 
-  const links = extractDriverLinks(
-    html,
-    baseUrl
-  );
-
-  return teams.map((team) => {
-    const linked = links.find(
-      (item) => item.name === team.name
-    );
-
-    return {
-      ...team,
-      driverResultUrl:
-        linked?.driverResultUrl ?? null,
-    };
-  });
-}
-
-function parseDriverResult(
-  html: string
-): Lap[] {
-  const rows = extractTableRows(html);
-  const laps: Lap[] = [];
-
-  for (const cells of rows) {
-    if (cells.length < 2) continue;
-
-    const lapNumber = Number(cells[0]);
-
-    const lapTime = parseTime(cells[1]);
-
-    if (
-      Number.isInteger(lapNumber) &&
-      lapNumber > 0 &&
-      lapTime !== null &&
-      lapTime > 0
-    ) {
-      laps.push({
-        lapNumber,
-        lapTime,
-      });
-    }
-  }
-
-  return laps.sort(
-    (a, b) =>
-      a.lapNumber - b.lapNumber
+  /*
+   * Remove duplicates while keeping the first occurrence.
+   */
+  return Array.from(
+    new Map(
+      teams.map((team) => [
+        team.name.toLowerCase(),
+        team,
+      ])
+    ).values()
   );
 }
 
-async function fetchPage(url: string) {
-  const response = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 RC Endurance Dashboard",
-      Accept:
-        "text/html,application/xhtml+xml",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `RC-Results returned ${response.status}`
-    );
-  }
-
-  return response.text();
-}
-
-export async function GET(
-  request: NextRequest
-) {
-  const searchParams =
-    request.nextUrl.searchParams;
-
+export async function GET(request: NextRequest) {
   const raceUrl =
-    searchParams.get("url");
-
-  const teamName =
-    searchParams.get("team");
+    request.nextUrl.searchParams
+      .get("url")
+      ?.trim();
 
   if (!raceUrl) {
     return NextResponse.json(
       {
         error:
-          "Missing RC-Results race URL.",
+          "Missing RC-Results URL.",
       },
       { status: 400 }
     );
@@ -295,151 +255,90 @@ export async function GET(
   } catch {
     return NextResponse.json(
       {
-        error: "Invalid race URL.",
+        error:
+          "The RC-Results URL is invalid.",
       },
       { status: 400 }
     );
   }
 
   if (
-    !parsedUrl.hostname.endsWith(
-      "rc-results.com"
+    parsedUrl.protocol !== "https:" ||
+    !(
+      parsedUrl.hostname ===
+        "rc-results.com" ||
+      parsedUrl.hostname ===
+        "www.rc-results.com"
     )
   ) {
     return NextResponse.json(
       {
         error:
-          "Only rc-results.com URLs are supported.",
+          "Please use an https://rc-results.com live race URL.",
       },
       { status: 400 }
     );
   }
 
   try {
-    const html = await fetchPage(
-      parsedUrl.toString()
+    const response = await fetch(
+      parsedUrl.toString(),
+      {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (compatible; RC-Endurance-Dashboard/1.0)",
+          Accept:
+            "text/html,application/xhtml+xml",
+        },
+        cache: "no-store",
+      }
     );
 
-    const linkedTeams =
-      extractDriverLinks(
-        html,
-        parsedUrl.toString()
-      );
-
-    const tableTeams =
-      extractTeamsFromTables(
-        html,
-        parsedUrl.toString()
-      );
-
-    const combinedTeams = [
-      ...linkedTeams,
-      ...tableTeams,
-    ].filter(
-      (team, index, array) =>
-        array.findIndex(
-          (item) =>
-            item.name === team.name
-        ) === index
-    );
-
-    if (!teamName) {
-      return NextResponse.json({
-        sourceUrl:
-          parsedUrl.toString(),
-        teams: combinedTeams,
-        message:
-          combinedTeams.length > 0
-            ? "Select the team to track."
-            : "No team entries could be extracted from this page. Try the exact race results page rather than the meeting summary.",
-      });
-    }
-
-    const selectedTeam =
-      combinedTeams.find(
-        (team) =>
-          team.name.toLowerCase() ===
-          teamName.toLowerCase()
-      );
-
-    if (!selectedTeam) {
+    if (!response.ok) {
       return NextResponse.json(
         {
           error:
-            "Selected team was not found in the latest RC-Results data.",
-          teams: combinedTeams,
+            `RC-Results returned ${response.status}.`,
         },
-        { status: 404 }
+        {
+          status: 502,
+        }
       );
     }
 
-    let laps: Lap[] = [];
+    const html =
+      await response.text();
 
-    if (
-      selectedTeam.driverResultUrl
-    ) {
-      const driverHtml =
-        await fetchPage(
-          selectedTeam.driverResultUrl
-        );
-
-      laps =
-        parseDriverResult(driverHtml);
-    }
-
-    const bestLap =
-      laps.length > 0
-        ? Math.min(
-            ...laps.map(
-              (lap) => lap.lapTime
-            )
-          )
-        : selectedTeam.bestLap ?? null;
-
-    const averageLap =
-      laps.length > 0
-        ? laps.reduce(
-            (total, lap) =>
-              total + lap.lapTime,
-            0
-          ) / laps.length
-        : selectedTeam.averageLap ?? null;
-
-    return NextResponse.json({
-      sourceUrl:
-        parsedUrl.toString(),
-
-      team: {
-        ...selectedTeam,
-        laps:
-          laps.length > 0
-            ? laps.length
-            : selectedTeam.laps,
-        lastLap:
-          laps.length > 0
-            ? laps[laps.length - 1]
-                .lapTime
-            : selectedTeam.lastLap,
-        bestLap,
-        averageLap,
-      },
-
-      lapData: laps,
-
-      fetchedAt:
-        new Date().toISOString(),
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Could not fetch RC-Results.";
+    const teams =
+      parseTeams(html);
 
     return NextResponse.json(
       {
-        error: message,
+        teams,
+        message:
+          teams.length > 0
+            ? undefined
+            : "No live race rows were found. Make sure the race is currently available on RC-Results.",
       },
-      { status: 500 }
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, max-age=0",
+        },
+      }
+    );
+  } catch (error) {
+    console.error(
+      "RC-Results fetch failed:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          "Could not fetch live data from RC-Results.",
+      },
+      { status: 502 }
     );
   }
 }
