@@ -1053,7 +1053,19 @@ export default function Home() {
         setMessage(
           error.message
         );
+        return;
       }
+
+      /*
+       * Update local state immediately so Start/Pause/Reset take
+       * effect without waiting for a Supabase reload or Realtime event.
+       */
+      setRace({
+        ...currentRace,
+        ...updates,
+      });
+
+      setMessage("");
     };
 
   /*
