@@ -2236,6 +2236,53 @@ export default function Home() {
     };
 
   /*
+   * Live RC-Results statistics calculated from laps captured
+   * by this dashboard.
+   */
+  const liveLapTimes =
+    raceLaps
+      .map((lap) => Number(lap.lap_time_seconds))
+      .filter(
+        (lapTime) =>
+          Number.isFinite(lapTime) &&
+          lapTime > 0
+      );
+
+  const storedLastLap =
+    liveLapTimes.length > 0
+      ? liveLapTimes[liveLapTimes.length - 1]
+      : null;
+
+  const storedBestLap =
+    liveLapTimes.length > 0
+      ? Math.min(...liveLapTimes)
+      : null;
+
+  const storedAverageLap =
+    liveLapTimes.length > 0
+      ? liveLapTimes.reduce(
+          (total, lapTime) =>
+            total + lapTime,
+          0
+        ) / liveLapTimes.length
+      : null;
+
+  const displayLastLap =
+    storedLastLap ??
+    liveTeam?.lastLap ??
+    null;
+
+  const displayBestLap =
+    storedBestLap ??
+    liveTeam?.bestLap ??
+    null;
+
+  const displayAverageLap =
+    storedAverageLap ??
+    liveTeam?.averageLap ??
+    null;
+
+  /*
    * Current driver's
    * current stint laps.
    */
@@ -2694,7 +2741,7 @@ export default function Home() {
 
                   <b>
                     {fmtLap(
-                      liveTeam?.lastLap
+                      displayLastLap
                     )}
                   </b>
                 </div>
@@ -2706,7 +2753,7 @@ export default function Home() {
 
                   <b>
                     {fmtLap(
-                      liveTeam?.bestLap
+                      displayBestLap
                     )}
                   </b>
                 </div>
@@ -2718,7 +2765,7 @@ export default function Home() {
 
                   <b>
                     {fmtLap(
-                      liveTeam?.averageLap
+                      displayAverageLap
                     )}
                   </b>
                 </div>
