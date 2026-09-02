@@ -699,30 +699,38 @@ export default function Home() {
 
   /*
    * Add driver.
+   *
+   * Independent from queue, activity tracking and live timing.
    */
   const addDriver =
     async () => {
-      const currentSession =
-        session;
+      const currentSession = session;
+      const currentRace = race;
+      const driverName = newDriver.trim();
+      const db = supabase.current;
 
-      const currentRace =
-        race;
-
-      const name =
-        newDriver.trim();
-
-      if (
-        !currentSession ||
-        !currentRace ||
-        !name
-      ) {
+      if (!currentSession) {
+        setMessage(
+          "No active session. Please create or join a session first."
+        );
         return;
       }
 
-      const db =
-        supabase.current;
+      if (!driverName) {
+        setMessage(
+          "Please enter a driver name."
+        );
+        return;
+      }
 
-      if (!db) return;
+      if (!db) {
+        setMessage(
+          "Supabase is not configured."
+        );
+        return;
+      }
+
+      setMessage("");
 
       const {
         data,
@@ -732,27 +740,52 @@ export default function Home() {
         .insert({
           session_id:
             currentSession.id,
-          name,
+          name:
+            driverName,
         })
         .select()
         .single();
 
       if (error) {
+        console.error(
+          "Could not add driver:",
+          error
+        );
         setMessage(
-          error.message
+          `Could not save driver: ${error.message}`
         );
         return;
       }
 
-      if (!data) return;
+      if (!data) {
+        setMessage(
+          "Driver was not returned after saving."
+        );
+        return;
+      }
+
+      // Update immediately; do not depend on Supabase Realtime.
+      setDrivers(
+        (currentDrivers) =>
+          currentDrivers.some(
+            (driver) =>
+              driver.id === data.id
+          )
+            ? currentDrivers
+            : [
+                ...currentDrivers,
+                data as Driver,
+              ]
+      );
 
       setNewDriver("");
 
       /*
-       * First driver becomes
-       * current driver.
+       * Only assign the first driver to the race when the race
+       * row is available. Saving the driver does not depend on it.
        */
       if (
+        currentRace &&
         !currentRace.current_driver_id
       ) {
         const nowIso =
@@ -766,8 +799,10 @@ export default function Home() {
           .insert({
             session_id:
               currentSession.id,
-            driver_id: data.id,
-            started_at: nowIso,
+            driver_id:
+              data.id,
+            started_at:
+              nowIso,
             start_lap:
               raceLaps.length,
           })
@@ -775,21 +810,25 @@ export default function Home() {
           .single();
 
         if (stintError) {
+          console.error(
+            "Could not create first stint:",
+            stintError
+          );
           setMessage(
-            stintError.message
+            `Driver saved, but the first stint could not be created: ${stintError.message}`
           );
           return;
         }
 
-        await db
+        const {
+          error: raceError,
+        } = await db
           .from("races")
           .update({
             current_driver_id:
               data.id,
-
             current_stint_started_at:
               nowIso,
-
             active_stint_id:
               newStint?.id ??
               null,
@@ -798,6 +837,28 @@ export default function Home() {
             "id",
             currentRace.id
           );
+
+        if (raceError) {
+          console.error(
+            "Could not set current driver:",
+            raceError
+          );
+          setMessage(
+            `Driver saved, but could not set them as the current driver: ${raceError.message}`
+          );
+          return;
+        }
+
+        setRace({
+          ...currentRace,
+          current_driver_id:
+            data.id,
+          current_stint_started_at:
+            nowIso,
+          active_stint_id:
+            newStint?.id ??
+            null,
+        });
       }
     };
 
