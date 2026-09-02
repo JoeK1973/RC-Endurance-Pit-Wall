@@ -1057,3 +1057,7 @@ li button {
     gap: 5px;
   }
 }
+
+/* Race history and analytics */
+.activityNote{margin-top:14px}.activityNote input{width:100%;padding:10px}
+.historySection{margin-top:16px}.historyFilters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.historyFilters select,.historyFilters input{width:auto;min-width:150px;padding:9px;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:8px}.historyTableWrap{overflow-x:auto}.historyTable{width:100%;border-collapse:collapse;font-size:.9rem}.historyTable th,.historyTable td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.historyTable th{color:var(--muted);white-space:nowrap}.loadGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}.loadCard{border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;justify-content:space-between;gap:12px;align-items:center}.loadCard b{font-variant-numeric:tabular-nums;color:var(--accent)}.paceChart{width:100%;height:auto;min-height:220px;background:var(--soft);border-radius:12px;padding:8px}
