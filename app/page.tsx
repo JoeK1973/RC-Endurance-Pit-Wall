@@ -2607,18 +2607,6 @@ export default function Home() {
     [drivers, stints]
   );
 
-  const currentStintLaps = useMemo(
-    () =>
-      race?.active_stint_id
-        ? raceLaps.filter(
-            (lap) =>
-              lap.stint_id ===
-              race.active_stint_id
-          )
-        : [],
-    [race, raceLaps]
-  );
-
   const exportResults = () => {
     const rows = completedStints.map(
       (stintItem) => {
