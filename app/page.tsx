@@ -705,30 +705,40 @@ export default function Home() {
 
   /*
    * Add driver.
+   *
+   * This is intentionally independent of the live RC-Results
+   * tracking code. A driver can be added as soon as a session
+   * exists, even if the race row has not loaded yet.
    */
   const addDriver =
     async () => {
-      const currentSession =
-        session;
+      const currentSession = session;
+      const currentRace = race;
+      const name = newDriver.trim();
+      const db = supabase.current;
 
-      const currentRace =
-        race;
-
-      const name =
-        newDriver.trim();
-
-      if (
-        !currentSession ||
-        !currentRace ||
-        !name
-      ) {
+      if (!currentSession) {
+        setMessage(
+          "No active session. Please create or join a session first."
+        );
         return;
       }
 
-      const db =
-        supabase.current;
+      if (!name) {
+        setMessage(
+          "Please enter a driver name."
+        );
+        return;
+      }
 
-      if (!db) return;
+      if (!db) {
+        setMessage(
+          "Supabase is not configured."
+        );
+        return;
+      }
+
+      setMessage("");
 
       const {
         data,
@@ -744,21 +754,58 @@ export default function Home() {
         .single();
 
       if (error) {
+        console.error(
+          "Could not add driver:",
+          error
+        );
+
         setMessage(
-          error.message
+          `Could not save driver: ${error.message}`
         );
         return;
       }
 
-      if (!data) return;
+      if (!data) {
+        setMessage(
+          "Driver was not returned after saving."
+        );
+        return;
+      }
+
+      /*
+       * Update local state immediately. This avoids depending on
+       * Supabase Realtime before the newly-added driver appears.
+       */
+      setDrivers(
+        (currentDrivers) => {
+          const alreadyExists =
+            currentDrivers.some(
+              (driver) =>
+                driver.id === data.id
+            );
+
+          if (alreadyExists) {
+            return currentDrivers;
+          }
+
+          return [
+            ...currentDrivers,
+            data as Driver,
+          ];
+        }
+      );
 
       setNewDriver("");
 
       /*
-       * First driver becomes
-       * current driver.
+       * If this is the first driver and the race is available,
+       * make them the current driver and create their first stint.
+       *
+       * The driver remains saved even if either of these follow-up
+       * operations fails.
        */
       if (
+        currentRace &&
         !currentRace.current_driver_id
       ) {
         const nowIso =
@@ -772,8 +819,10 @@ export default function Home() {
           .insert({
             session_id:
               currentSession.id,
-            driver_id: data.id,
-            started_at: nowIso,
+            driver_id:
+              data.id,
+            started_at:
+              nowIso,
             start_lap:
               raceLaps.length,
           })
@@ -781,21 +830,27 @@ export default function Home() {
           .single();
 
         if (stintError) {
-          setMessage(
-            stintError.message
+          console.error(
+            "Could not create first driver stint:",
+            stintError
           );
+
+          setMessage(
+            `Driver saved, but the first stint could not be created: ${stintError.message}`
+          );
+
           return;
         }
 
-        await db
+        const {
+          error: raceError,
+        } = await db
           .from("races")
           .update({
             current_driver_id:
               data.id,
-
             current_stint_started_at:
               nowIso,
-
             active_stint_id:
               newStint?.id ??
               null,
@@ -804,6 +859,30 @@ export default function Home() {
             "id",
             currentRace.id
           );
+
+        if (raceError) {
+          console.error(
+            "Could not set current driver:",
+            raceError
+          );
+
+          setMessage(
+            `Driver saved, but could not set them as the current driver: ${raceError.message}`
+          );
+
+          return;
+        }
+
+        setRace({
+          ...currentRace,
+          current_driver_id:
+            data.id,
+          current_stint_started_at:
+            nowIso,
+          active_stint_id:
+            newStint?.id ??
+            null,
+        });
       }
     };
 
