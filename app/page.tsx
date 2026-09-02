@@ -907,7 +907,7 @@ export default function Home() {
        * a Supabase refresh or Realtime event after Start/Pause/Reset.
        */
       setRace({
-        ...currentRace,
+        ...race,
         ...updates,
       });
 
