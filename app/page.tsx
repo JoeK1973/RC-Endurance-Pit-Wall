@@ -702,22 +702,27 @@ export default function Home() {
    */
   const addDriver =
     async () => {
-      const currentSession = session;
-      const name = newDriver.trim();
-      const db = supabase.current;
+      const currentSession =
+        session;
 
-      if (!currentSession || !name) {
+      const currentRace =
+        race;
+
+      const name =
+        newDriver.trim();
+
+      if (
+        !currentSession ||
+        !currentRace ||
+        !name
+      ) {
         return;
       }
 
-      if (!db) {
-        setMessage(
-          "Supabase is not configured."
-        );
-        return;
-      }
+      const db =
+        supabase.current;
 
-      setMessage("");
+      if (!db) return;
 
       const {
         data,
@@ -725,63 +730,29 @@ export default function Home() {
       } = await db
         .from("drivers")
         .insert({
-          session_id: currentSession.id,
+          session_id:
+            currentSession.id,
           name,
         })
         .select()
         .single();
 
       if (error) {
-        console.error(
-          "Could not add driver:",
-          error
-        );
-
         setMessage(
-          `Could not save driver: ${error.message}`
+          error.message
         );
         return;
       }
 
-      if (!data) {
-        setMessage(
-          "Driver was not returned after saving."
-        );
-        return;
-      }
-
-      /*
-       * Update this device immediately.
-       * This means adding a driver does not
-       * depend on Supabase Realtime being enabled.
-       */
-      setDrivers((currentDrivers) => {
-        if (
-          currentDrivers.some(
-            (driver) =>
-              driver.id === data.id
-          )
-        ) {
-          return currentDrivers;
-        }
-
-        return [
-          ...currentDrivers,
-          data as Driver,
-        ];
-      });
+      if (!data) return;
 
       setNewDriver("");
 
-      const currentRace = race;
-
       /*
-       * Make the first driver the current driver.
-       * If driver_stints is unavailable or fails,
-       * the driver itself is still kept.
+       * First driver becomes
+       * current driver.
        */
       if (
-        currentRace &&
         !currentRace.current_driver_id
       ) {
         const nowIso =
@@ -804,63 +775,30 @@ export default function Home() {
           .single();
 
         if (stintError) {
-          console.error(
-            "Could not create first driver stint:",
-            stintError
-          );
-
           setMessage(
-            `Driver saved, but the first stint could not be created: ${stintError.message}`
+            stintError.message
           );
-        } else {
-          const { error: raceError } =
-            await db
-              .from("races")
-              .update({
-                current_driver_id:
-                  data.id,
-                current_stint_started_at:
-                  nowIso,
-                active_stint_id:
-                  newStint?.id ??
-                  null,
-              })
-              .eq(
-                "id",
-                currentRace.id
-              );
-
-          if (raceError) {
-            console.error(
-              "Could not set current driver:",
-              raceError
-            );
-
-            setMessage(
-              `Driver saved, but could not set them as the current driver: ${raceError.message}`
-            );
-          } else {
-            setRace({
-              ...currentRace,
-              current_driver_id:
-                data.id,
-              current_stint_started_at:
-                nowIso,
-              active_stint_id:
-                newStint?.id ??
-                null,
-            });
-          }
+          return;
         }
-      }
 
-      /*
-       * Refresh from Supabase so all devices
-       * converge even if Realtime is disabled.
-       */
-      await loadSession(
-        currentSession.session_code
-      );
+        await db
+          .from("races")
+          .update({
+            current_driver_id:
+              data.id,
+
+            current_stint_started_at:
+              nowIso,
+
+            active_stint_id:
+              newStint?.id ??
+              null,
+          })
+          .eq(
+            "id",
+            currentRace.id
+          );
+      }
     };
 
   /*
@@ -904,7 +842,7 @@ export default function Home() {
 
   /*
    * Add driver to queue.
-   * Duplicate entries are allowed.
+   * Duplicate entries allowed.
    */
   const addQueue =
     async (
@@ -913,24 +851,14 @@ export default function Home() {
       const currentSession =
         session;
 
+      if (!currentSession) {
+        return;
+      }
+
       const db =
         supabase.current;
 
-      if (!currentSession) {
-        setMessage(
-          "No active session."
-        );
-        return;
-      }
-
-      if (!db) {
-        setMessage(
-          "Supabase is not configured."
-        );
-        return;
-      }
-
-      setMessage("");
+      if (!db) return;
 
       const highestPosition =
         queue.reduce(
@@ -945,61 +873,23 @@ export default function Home() {
           0
         );
 
-      const {
-        data,
-        error,
-      } = await db
-        .from("driver_queue")
-        .insert({
-          session_id:
-            currentSession.id,
-          driver_id:
-            driverId,
-          position:
-            highestPosition + 1,
-        })
-        .select(
-          "id, driver_id, position"
-        )
-        .single();
+      const { error } =
+        await db
+          .from("driver_queue")
+          .insert({
+            session_id:
+              currentSession.id,
+            driver_id:
+              driverId,
+            position:
+              highestPosition + 1,
+          });
 
       if (error) {
-        console.error(
-          "Could not add driver to queue:",
-          error
-        );
-
         setMessage(
-          `Could not add driver to queue: ${error.message}`
+          error.message
         );
-        return;
       }
-
-      if (!data) {
-        setMessage(
-          "Queue entry was not returned after saving."
-        );
-        return;
-      }
-
-      /*
-       * Update this device immediately.
-       * This does not depend on Supabase Realtime.
-       */
-      setQueue(
-        (currentQueue) => [
-          ...currentQueue,
-          data as QueueItem,
-        ]
-      );
-
-      /*
-       * Refresh from Supabase so all devices
-       * eventually have exactly the same queue.
-       */
-      await loadSession(
-        currentSession.session_code
-      );
     };
 
   /*
@@ -1009,17 +899,10 @@ export default function Home() {
     async (
       queueItemId: string
     ) => {
-      const currentSession =
-        session;
-
       const db =
         supabase.current;
 
-      if (!currentSession || !db) {
-        return;
-      }
-
-      setMessage("");
+      if (!db) return;
 
       const { error } =
         await db
@@ -1031,33 +914,17 @@ export default function Home() {
           );
 
       if (error) {
-        console.error(
-          "Could not remove queue entry:",
-          error
-        );
-
         setMessage(
-          `Could not remove queue entry: ${error.message}`
+          error.message
         );
-        return;
       }
-
-      setQueue(
-        (currentQueue) =>
-          currentQueue.filter(
-            (item) =>
-              item.id !==
-              queueItemId
-          )
-      );
-
-      await loadSession(
-        currentSession.session_code
-      );
     };
 
   /*
    * Update race safely.
+   *
+   * Update the local state immediately so the timer
+   * does not depend on Supabase Realtime being enabled.
    */
   const updateRace =
     async (
@@ -1066,29 +933,103 @@ export default function Home() {
       const currentRace =
         race;
 
-      if (!currentRace) {
-        return;
-      }
+      const currentSession =
+        session;
 
       const db =
         supabase.current;
 
-      if (!db) return;
+      if (
+        !currentRace ||
+        !currentSession ||
+        !db
+      ) {
+        return false;
+      }
 
-      const { error } =
-        await db
-          .from("races")
-          .update(updates)
-          .eq(
-            "id",
-            currentRace.id
-          );
+      setMessage("");
+
+      const {
+        data,
+        error,
+      } = await db
+        .from("races")
+        .update(updates)
+        .eq(
+          "id",
+          currentRace.id
+        )
+        .select("*")
+        .single();
 
       if (error) {
+        console.error(
+          "Could not update race:",
+          error
+        );
+
         setMessage(
-          error.message
+          `Could not update race: ${error.message}`
+        );
+
+        return false;
+      }
+
+      /*
+       * Apply the returned row immediately.
+       */
+      if (data) {
+        setRace((existingRace) => {
+          if (!existingRace) {
+            return existingRace;
+          }
+
+          return {
+            ...existingRace,
+            ...data,
+            duration_seconds:
+              Number(
+                data.duration_seconds ??
+                  existingRace.duration_seconds
+              ),
+            accumulated_pause_seconds:
+              Number(
+                data.accumulated_pause_seconds ??
+                  existingRace.accumulated_pause_seconds
+              ),
+            activity_rotation:
+              Number(
+                data.activity_rotation ??
+                  existingRace.activity_rotation
+              ),
+          } as Race;
+        });
+      } else {
+        setRace((existingRace) =>
+          existingRace
+            ? {
+                ...existingRace,
+                ...updates,
+              }
+            : existingRace
         );
       }
+
+      /*
+       * Force an immediate timer recalculation.
+       */
+      setNow(Date.now());
+
+      /*
+       * Refresh from Supabase in the background.
+       * This keeps all shared devices in sync even
+       * when Realtime is not configured.
+       */
+      void loadSession(
+        currentSession.session_code
+      );
+
+      return true;
     };
 
   /*
