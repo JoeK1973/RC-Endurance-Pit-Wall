@@ -1290,8 +1290,11 @@ export default function Home() {
     };
 
   /*
-   * Battery swap,
-   * driver swap or both.
+   * Battery swap, driver swap or both.
+   *
+   * This function updates Supabase and the local UI state separately.
+   * It intentionally does not change the timer, live tracking, drivers
+   * list or queue add/remove functions.
    */
   const swap =
     async (
@@ -1300,224 +1303,174 @@ export default function Home() {
         | "driver_swap"
         | "full_swap"
     ) => {
-      const currentSession =
-        session;
+      const currentSession = session;
+      const currentRace = race;
+      const db = supabase.current;
 
-      const currentRace =
-        race;
-
-      if (
-        !currentSession ||
-        !currentRace
-      ) {
+      if (!currentSession || !currentRace) {
+        setMessage(
+          "Race data is not ready yet. Please wait a moment and try again."
+        );
         return;
       }
 
-      const db =
-        supabase.current;
-
-      if (!db) return;
+      if (!db) {
+        setMessage("Supabase is not configured.");
+        return;
+      }
 
       setMessage("");
 
-      let incomingDriverId =
-        currentRace.current_driver_id;
-
-      const firstQueueItem =
-        queue.length > 0
-          ? queue[0]
-          : null;
-
       /*
-       * Driver change.
+       * Battery-only change: reset the stint start time but keep
+       * the same driver, queue and activity rotation.
        */
-      if (
-        type !==
-        "battery_swap"
-      ) {
-        if (!firstQueueItem) {
-          setMessage(
-            "There is no driver in the queue."
-          );
+      if (type === "battery_swap") {
+        const nowIso = new Date().toISOString();
 
+        const { error } = await db
+          .from("races")
+          .update({
+            current_stint_started_at: nowIso,
+          })
+          .eq("id", currentRace.id);
+
+        if (error) {
+          setMessage(error.message);
           return;
         }
 
-        incomingDriverId =
-          firstQueueItem.driver_id;
+        setRace({
+          ...currentRace,
+          current_stint_started_at: nowIso,
+        });
 
-        /*
-         * Close outgoing stint.
-         */
-        await closeCurrentStint();
-
-        /*
-         * Remove exact queue entry.
-         */
-        const {
-          error: deleteError,
-        } = await db
-          .from("driver_queue")
-          .delete()
-          .eq(
-            "id",
-            firstQueueItem.id
-          );
-
-        if (deleteError) {
-          setMessage(
-            deleteError.message
-          );
-
-          return;
-        }
-
-        /*
-         * Add outgoing driver
-         * to the back of queue.
-         */
-        if (
-          currentRace.current_driver_id
-        ) {
-          const highestPosition =
-            queue.reduce(
-              (
-                highest,
-                item
-              ) =>
-                Math.max(
-                  highest,
-                  item.position
-                ),
-              0
-            );
-
-          const {
-            error: insertError,
-          } = await db
-            .from(
-              "driver_queue"
-            )
-            .insert({
-              session_id:
-                currentSession.id,
-
-              driver_id:
-                currentRace.current_driver_id,
-
-              position:
-                highestPosition + 1,
-            });
-
-          if (insertError) {
-            setMessage(
-              insertError.message
-            );
-
-            return;
-          }
-        }
+        return;
       }
 
       /*
-       * Save event.
+       * Driver/full change: consume exactly the first queue item.
+       * Do NOT automatically put the outgoing driver back in the queue;
+       * this makes the queue visibly move down and leaves the next
+       * rotation entirely under the user's control.
+       */
+      const firstQueueItem = queue[0];
+
+      if (!firstQueueItem) {
+        setMessage(
+          "There is no driver in the queue."
+        );
+        return;
+      }
+
+      const incomingDriverId =
+        firstQueueItem.driver_id;
+
+      const nowIso =
+        new Date().toISOString();
+
+      /*
+       * Close the outgoing stint first. This is left intact so driver
+       * lap/stint statistics continue to work.
+       */
+      await closeCurrentStint();
+
+      const { error: deleteError } =
+        await db
+          .from("driver_queue")
+          .delete()
+          .eq("id", firstQueueItem.id);
+
+      if (deleteError) {
+        setMessage(deleteError.message);
+        return;
+      }
+
+      /*
+       * Save the incoming stint.
        */
       const {
-        error: eventError,
+        data: newStint,
+        error: stintError,
       } = await db
-        .from("race_events")
+        .from("driver_stints")
         .insert({
-          session_id:
-            currentSession.id,
+          session_id: currentSession.id,
+          driver_id: incomingDriverId,
+          started_at: nowIso,
+          start_lap: raceLaps.length,
+        })
+        .select()
+        .single();
 
-          event_type:
-            type,
+      if (stintError) {
+        setMessage(stintError.message);
+        return;
+      }
 
-          outgoing_driver_id:
-            currentRace.current_driver_id,
+      const nextActivityRotation =
+        (currentRace.activity_rotation ?? 0) + 1;
 
-          incoming_driver_id:
-            incomingDriverId,
-        });
+      const { error: raceUpdateError } =
+        await db
+          .from("races")
+          .update({
+            current_driver_id: incomingDriverId,
+            current_stint_started_at: nowIso,
+            activity_rotation: nextActivityRotation,
+            active_stint_id: newStint?.id ?? null,
+          })
+          .eq("id", currentRace.id);
+
+      if (raceUpdateError) {
+        setMessage(raceUpdateError.message);
+        return;
+      }
+
+      /*
+       * Save the event after the successful state change.
+       */
+      const { error: eventError } =
+        await db
+          .from("race_events")
+          .insert({
+            session_id: currentSession.id,
+            event_type: type,
+            outgoing_driver_id:
+              currentRace.current_driver_id,
+            incoming_driver_id:
+              incomingDriverId,
+          });
 
       if (eventError) {
-        setMessage(
-          eventError.message
+        console.error(
+          "Could not save race event:",
+          eventError
         );
       }
 
       /*
-       * Battery-only swap
-       * does not change driver.
+       * Update the queue and race immediately. This is what makes
+       * Current Driver and Activity Tracker change without waiting
+       * for Supabase Realtime.
        */
-      if (
-        type ===
-        "battery_swap"
-      ) {
-        await updateRace({
-          current_stint_started_at:
-            new Date().toISOString(),
-        });
+      setQueue(
+        (currentQueue) =>
+          currentQueue.filter(
+            (item) =>
+              item.id !== firstQueueItem.id
+          )
+      );
 
-        return;
-      }
-
-      if (incomingDriverId) {
-        const nowIso =
-          new Date().toISOString();
-
-        const {
-          data: newStint,
-          error: stintError,
-        } = await db
-          .from("driver_stints")
-          .insert({
-            session_id:
-              currentSession.id,
-
-            driver_id:
-              incomingDriverId,
-
-            started_at:
-              nowIso,
-
-            start_lap:
-              raceLaps.length,
-          })
-          .select()
-          .single();
-
-        if (stintError) {
-          setMessage(
-            stintError.message
-          );
-
-          return;
-        }
-
-        await db
-          .from("races")
-          .update({
-            current_driver_id:
-              incomingDriverId,
-
-            current_stint_started_at:
-              nowIso,
-
-            activity_rotation:
-              currentRace.activity_rotation +
-              1,
-
-            active_stint_id:
-              newStint?.id ??
-              null,
-          })
-          .eq(
-            "id",
-            currentRace.id
-          );
-      }
+      setRace({
+        ...currentRace,
+        current_driver_id: incomingDriverId,
+        current_stint_started_at: nowIso,
+        activity_rotation: nextActivityRotation,
+        active_stint_id: newStint?.id ?? null,
+      });
     };
+
 
   /*
    * Manually set current driver.
