@@ -705,60 +705,71 @@ export default function Home() {
 
   /*
    * Add driver.
+   *
+   * This does not touch live RC-Results tracking. A driver only
+   * requires an active session; the race row may temporarily be null.
    */
   const addDriver =
     async () => {
-      const currentSession =
-        session;
+      const currentSession = session;
+      const currentRace = race;
+      const name = newDriver.trim();
+      const db = supabase.current;
 
-      const currentRace =
-        race;
-
-      const name =
-        newDriver.trim();
-
-      if (
-        !currentSession ||
-        !currentRace ||
-        !name
-      ) {
-        return;
-      }
-
-      const db =
-        supabase.current;
-
-      if (!db) return;
-
-      const {
-        data,
-        error,
-      } = await db
-        .from("drivers")
-        .insert({
-          session_id:
-            currentSession.id,
-          name,
-        })
-        .select()
-        .single();
-
-      if (error) {
+      if (!currentSession) {
         setMessage(
-          error.message
+          "No active session. Please create or join a session first."
         );
         return;
       }
 
-      if (!data) return;
+      if (!name) {
+        setMessage("Please enter a driver name.");
+        return;
+      }
+
+      if (!db) {
+        setMessage("Supabase is not configured.");
+        return;
+      }
+
+      setMessage("");
+
+      const { data, error } =
+        await db
+          .from("drivers")
+          .insert({
+            session_id: currentSession.id,
+            name,
+          })
+          .select()
+          .single();
+
+      if (error || !data) {
+        setMessage(
+          error?.message ??
+            "Could not save driver."
+        );
+        return;
+      }
+
+      // Show the saved driver immediately; do not rely on Realtime.
+      setDrivers((current) =>
+        current.some(
+          (driver) => driver.id === data.id
+        )
+          ? current
+          : [
+              ...current,
+              data as Driver,
+            ]
+      );
 
       setNewDriver("");
 
-      /*
-       * First driver becomes
-       * current driver.
-       */
+      // If this is the first driver, assign them only when a race exists.
       if (
+        currentRace &&
         !currentRace.current_driver_id
       ) {
         const nowIso =
@@ -770,40 +781,46 @@ export default function Home() {
         } = await db
           .from("driver_stints")
           .insert({
-            session_id:
-              currentSession.id,
+            session_id: currentSession.id,
             driver_id: data.id,
             started_at: nowIso,
-            start_lap:
-              raceLaps.length,
+            start_lap: raceLaps.length,
           })
           .select()
           .single();
 
         if (stintError) {
           setMessage(
-            stintError.message
+            `Driver saved, but the first stint could not be created: ${stintError.message}`
           );
           return;
         }
 
-        await db
-          .from("races")
-          .update({
-            current_driver_id:
-              data.id,
+        const { error: raceError } =
+          await db
+            .from("races")
+            .update({
+              current_driver_id: data.id,
+              current_stint_started_at: nowIso,
+              active_stint_id:
+                newStint?.id ?? null,
+            })
+            .eq("id", currentRace.id);
 
-            current_stint_started_at:
-              nowIso,
-
-            active_stint_id:
-              newStint?.id ??
-              null,
-          })
-          .eq(
-            "id",
-            currentRace.id
+        if (raceError) {
+          setMessage(
+            `Driver saved, but could not set them as current driver: ${raceError.message}`
           );
+          return;
+        }
+
+        setRace({
+          ...currentRace,
+          current_driver_id: data.id,
+          current_stint_started_at: nowIso,
+          active_stint_id:
+            newStint?.id ?? null,
+        });
       }
     };
 
@@ -847,11 +864,8 @@ export default function Home() {
     };
 
   /*
-   * Add driver to queue.
-   *
-   * Drivers may appear multiple times. The new queue row is
-   * returned by Supabase and added to local state immediately,
-   * so this does not depend on Realtime being enabled.
+   * Add one occurrence of a driver to the queue.
+   * The same driver may be added any number of times.
    */
   const addQueue =
     async (
@@ -868,32 +882,13 @@ export default function Home() {
       }
 
       if (!db) {
-        setMessage(
-          "Supabase is not configured."
-        );
-        return;
-      }
-
-      const driverExists =
-        drivers.some(
-          (driver) =>
-            driver.id === driverId
-        );
-
-      if (!driverExists) {
-        setMessage(
-          "That driver could not be found."
-        );
+        setMessage("Supabase is not configured.");
         return;
       }
 
       setMessage("");
 
-      /*
-       * Use the highest current position so duplicates are allowed
-       * and removed items do not need to be renumbered.
-       */
-      const nextPosition =
+      const highestPosition =
         queue.reduce(
           (highest, item) =>
             Math.max(
@@ -901,52 +896,31 @@ export default function Home() {
               Number(item.position) || 0
             ),
           0
-        ) + 1;
-
-      const {
-        data,
-        error,
-      } = await db
-        .from("driver_queue")
-        .insert({
-          session_id:
-            currentSession.id,
-          driver_id:
-            driverId,
-          position:
-            nextPosition,
-        })
-        .select(
-          "id, driver_id, position"
-        )
-        .single();
-
-      if (error) {
-        console.error(
-          "Could not add driver to queue:",
-          error
         );
 
+      const { data, error } =
+        await db
+          .from("driver_queue")
+          .insert({
+            session_id: currentSession.id,
+            driver_id: driverId,
+            position: highestPosition + 1,
+          })
+          .select("id, driver_id, position")
+          .single();
+
+      if (error || !data) {
         setMessage(
-          `Could not add to queue: ${error.message}`
+          error?.message ??
+            "Could not add driver to queue."
         );
         return;
       }
 
-      if (!data) {
-        setMessage(
-          "The queue entry was saved but was not returned."
-        );
-        return;
-      }
-
-      /*
-       * Update immediately. This is the important fix for sessions
-       * where Supabase Realtime is not updating the queue.
-       */
-      setQueue(
-        (currentQueue) => [
-          ...currentQueue,
+      // Update locally immediately.
+      setQueue((current) =>
+        [
+          ...current,
           data as QueueItem,
         ].sort(
           (a, b) =>
@@ -957,60 +931,34 @@ export default function Home() {
     };
 
   /*
-   * Remove exactly one queue entry.
-   *
-   * The queue entry id is used, not the driver id, so the same
-   * driver can appear multiple times and each occurrence can be
-   * removed independently.
+   * Remove one exact queue occurrence.
    */
   const removeQueue =
     async (
       queueItemId: string
     ) => {
-      const db =
-        supabase.current;
+      const db = supabase.current;
 
       if (!db) {
-        setMessage(
-          "Supabase is not configured."
-        );
+        setMessage("Supabase is not configured.");
         return;
       }
 
-      setMessage("");
-
-      const {
-        error,
-      } = await db
-        .from("driver_queue")
-        .delete()
-        .eq(
-          "id",
-          queueItemId
-        );
+      const { error } =
+        await db
+          .from("driver_queue")
+          .delete()
+          .eq("id", queueItemId);
 
       if (error) {
-        console.error(
-          "Could not remove queue entry:",
-          error
-        );
-
-        setMessage(
-          `Could not remove from queue: ${error.message}`
-        );
+        setMessage(error.message);
         return;
       }
 
-      /*
-       * Remove only this exact occurrence locally.
-       */
-      setQueue(
-        (currentQueue) =>
-          currentQueue.filter(
-            (item) =>
-              item.id !==
-              queueItemId
-          )
+      setQueue((current) =>
+        current.filter(
+          (item) => item.id !== queueItemId
+        )
       );
     };
 
@@ -1367,17 +1315,11 @@ export default function Home() {
           return;
         }
 
-        /*
-         * Remove the consumed queue entry locally as well. This
-         * preserves correct queue behaviour even without Realtime.
-         */
-        setQueue(
-          (currentQueue) =>
-            currentQueue.filter(
-              (item) =>
-                item.id !==
-                firstQueueItem.id
-            )
+        setQueue((current) =>
+          current.filter(
+            (item) =>
+              item.id !== firstQueueItem.id
+          )
         );
 
         /*
@@ -1401,7 +1343,6 @@ export default function Home() {
             );
 
           const {
-            data: insertedQueueItem,
             error: insertError,
           } = await db
             .from(
@@ -1416,11 +1357,7 @@ export default function Home() {
 
               position:
                 highestPosition + 1,
-            })
-            .select(
-              "id, driver_id, position"
-            )
-            .single();
+            });
 
           if (insertError) {
             setMessage(
@@ -1428,19 +1365,6 @@ export default function Home() {
             );
 
             return;
-          }
-
-          if (insertedQueueItem) {
-            setQueue(
-              (currentQueue) => [
-                ...currentQueue,
-                insertedQueueItem as QueueItem,
-              ].sort(
-                (a, b) =>
-                  Number(a.position) -
-                  Number(b.position)
-              )
-            );
           }
         }
       }
