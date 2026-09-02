@@ -922,9 +922,6 @@ export default function Home() {
 
   /*
    * Update race safely.
-   *
-   * Update the local state immediately so the timer
-   * does not depend on Supabase Realtime being enabled.
    */
   const updateRace =
     async (
@@ -933,103 +930,29 @@ export default function Home() {
       const currentRace =
         race;
 
-      const currentSession =
-        session;
+      if (!currentRace) {
+        return;
+      }
 
       const db =
         supabase.current;
 
-      if (
-        !currentRace ||
-        !currentSession ||
-        !db
-      ) {
-        return false;
-      }
+      if (!db) return;
 
-      setMessage("");
-
-      const {
-        data,
-        error,
-      } = await db
-        .from("races")
-        .update(updates)
-        .eq(
-          "id",
-          currentRace.id
-        )
-        .select("*")
-        .single();
+      const { error } =
+        await db
+          .from("races")
+          .update(updates)
+          .eq(
+            "id",
+            currentRace.id
+          );
 
       if (error) {
-        console.error(
-          "Could not update race:",
-          error
-        );
-
         setMessage(
-          `Could not update race: ${error.message}`
-        );
-
-        return false;
-      }
-
-      /*
-       * Apply the returned row immediately.
-       */
-      if (data) {
-        setRace((existingRace) => {
-          if (!existingRace) {
-            return existingRace;
-          }
-
-          return {
-            ...existingRace,
-            ...data,
-            duration_seconds:
-              Number(
-                data.duration_seconds ??
-                  existingRace.duration_seconds
-              ),
-            accumulated_pause_seconds:
-              Number(
-                data.accumulated_pause_seconds ??
-                  existingRace.accumulated_pause_seconds
-              ),
-            activity_rotation:
-              Number(
-                data.activity_rotation ??
-                  existingRace.activity_rotation
-              ),
-          } as Race;
-        });
-      } else {
-        setRace((existingRace) =>
-          existingRace
-            ? {
-                ...existingRace,
-                ...updates,
-              }
-            : existingRace
+          error.message
         );
       }
-
-      /*
-       * Force an immediate timer recalculation.
-       */
-      setNow(Date.now());
-
-      /*
-       * Refresh from Supabase in the background.
-       * This keeps all shared devices in sync even
-       * when Realtime is not configured.
-       */
-      void loadSession(
-        currentSession.session_code
-      );
-
-      return true;
     };
 
   /*
@@ -1726,8 +1649,11 @@ export default function Home() {
     };
 
   /*
-   * Poll RC-Results and
-   * store newly completed laps.
+   * Poll RC-Results and store completed laps.
+   *
+   * This version does not depend on a Supabase unique
+   * constraint for upsert(). It filters out laps already
+   * known locally, then inserts only genuinely new laps.
    */
   const pollLiveResults =
     useCallback(
@@ -1741,12 +1667,16 @@ export default function Home() {
         const currentRace =
           race;
 
+        const db =
+          supabase.current;
+
         if (
           !currentConfig?.enabled ||
           !currentConfig.race_url ||
           !currentConfig.team_name ||
           !currentSession ||
-          !currentRace
+          !currentRace ||
+          !db
         ) {
           return;
         }
@@ -1760,38 +1690,99 @@ export default function Home() {
                 currentConfig.team_name
               )}`,
               {
-                cache:
-                  "no-store",
+                cache: "no-store",
               }
             );
+
+          const contentType =
+            response.headers.get(
+              "content-type"
+            ) ?? "";
+
+          if (
+            !contentType.includes(
+              "application/json"
+            )
+          ) {
+            const responseText =
+              await response.text();
+
+            console.error(
+              "RC-Results polling returned non-JSON:",
+              responseText
+            );
+
+            setMessage(
+              "RC-Results returned an invalid response while checking laps."
+            );
+
+            return;
+          }
 
           const data =
             await response.json();
 
-          if (
-            !response.ok
-          ) {
+          if (!response.ok) {
+            console.error(
+              "RC-Results polling failed:",
+              data
+            );
+
+            setMessage(
+              data.error ??
+                "Could not update RC-Results laps."
+            );
+
             return;
           }
 
           if (data.team) {
             setLiveTeam(
-              data.team
+              data.team as LiveTeam
             );
           }
 
-          const incomingLaps:
-            LiveLap[] =
+          const incomingLaps: LiveLap[] =
             Array.isArray(
               data.lapData
             )
               ? data.lapData
+                  .map(
+                    (
+                      lap: LiveLap
+                    ) => ({
+                      lapNumber:
+                        Number(
+                          lap.lapNumber
+                        ),
+                      lapTime:
+                        Number(
+                          lap.lapTime
+                        ),
+                    })
+                  )
+                  .filter(
+                    (lap: LiveLap) =>
+                      Number.isFinite(
+                        lap.lapNumber
+                      ) &&
+                      lap.lapNumber > 0 &&
+                      Number.isFinite(
+                        lap.lapTime
+                      ) &&
+                      lap.lapTime > 0
+                  )
               : [];
 
           setLiveLaps(
             incomingLaps
           );
 
+          /*
+           * If RC-Results is providing only the summary
+           * and no individual lap data, show the live
+           * total but do not pretend that laps were saved.
+           */
           if (
             incomingLaps.length === 0
           ) {
@@ -1821,16 +1812,11 @@ export default function Home() {
           }
 
           /*
-           * Attribute new laps
-           * to the driver who is
-           * currently driving.
+           * Always store new laps, even if no driver has
+           * been selected yet. Driver/stint IDs can be null
+           * for those laps, allowing the overall lap count
+           * to continue working.
            */
-          if (
-            !currentRace.current_driver_id
-          ) {
-            return;
-          }
-
           const rows =
             newLaps.map(
               (lap) => ({
@@ -1838,10 +1824,12 @@ export default function Home() {
                   currentSession.id,
 
                 stint_id:
-                  currentRace.active_stint_id,
+                  currentRace.active_stint_id ??
+                  null,
 
                 driver_id:
-                  currentRace.current_driver_id,
+                  currentRace.current_driver_id ??
+                  null,
 
                 lap_number:
                   lap.lapNumber,
@@ -1857,17 +1845,21 @@ export default function Home() {
           const {
             data: inserted,
             error,
-          } = await supabase.current
+          } = await db
             .from("race_laps")
-            .upsert(rows, {
-              onConflict:
-                "session_id,lap_number",
-              ignoreDuplicates:
-                true,
-            })
+            .insert(rows)
             .select();
 
           if (error) {
+            console.error(
+              "Could not save RC-Results laps:",
+              error
+            );
+
+            setMessage(
+              `RC-Results laps found, but could not save them: ${error.message}`
+            );
+
             return;
           }
 
@@ -1907,13 +1899,26 @@ export default function Home() {
                 );
               }
             );
+
+            setMessage(
+              `${inserted.length} new RC-Results lap${
+                inserted.length === 1
+                  ? ""
+                  : "s"
+              } recorded.`
+            );
           }
-        } catch {
-          /*
-           * Keep the dashboard
-           * running if RC-Results
-           * temporarily fails.
-           */
+        } catch (error) {
+          console.error(
+            "RC-Results polling failed:",
+            error
+          );
+
+          setMessage(
+            error instanceof Error
+              ? `RC-Results update failed: ${error.message}`
+              : "RC-Results update failed."
+          );
         }
       },
       [
