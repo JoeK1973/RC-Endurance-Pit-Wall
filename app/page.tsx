@@ -13,7 +13,9 @@ export default function Home(){
  const [elapsed,setElapsed]=useState(0),[stint,setStint]=useState(0),[events,setEvents]=useState<string[]>([]);
  const [dark,setDark]=useState(false);
  useEffect(()=>{if(status!=="running")return;const t=setInterval(()=>{setElapsed(x=>x+1);setStint(x=>x+1)},1000);return()=>clearInterval(t)},[status]);
- useEffect(()=>document.documentElement.dataset.theme=dark?"dark":"light",[dark]);
+ useEffect(() => {
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+}, [dark]);
  const name=(id:string)=>drivers.find(d=>d.id===id)?.name??"No driver";
  const event=(text:string)=>setEvents(e=>[`${fmt(elapsed)} — ${text}`,...e].slice(0,30));
  const driverSwap=()=>{const next=queue[0];if(!next)return alert("Add a driver to the queue first.");event(`Driver change: ${name(current)} → ${name(next)}`);setCurrent(next);setQueue(q=>[...q.slice(1),current]);setStint(0)};
