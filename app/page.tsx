@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { QRCodeSVG } from "qrcode.react";
+import * as XLSX from "xlsx";
 import {
   createClient,
   hasSupabase,
@@ -78,6 +79,26 @@ type LiveTeam = {
 type LiveLap = {
   lapNumber: number;
   lapTime: number;
+};
+
+type DriverStint = {
+  id: string;
+  session_id: string;
+  driver_id: string;
+  started_at: string;
+  ended_at: string | null;
+  start_lap: number;
+  end_lap: number | null;
+};
+
+type RaceEvent = {
+  id: string;
+  session_id: string;
+  event_type: "battery_swap" | "driver_swap" | "full_swap" | string;
+  outgoing_driver_id: string | null;
+  incoming_driver_id: string | null;
+  created_at: string;
+  notes?: string | null;
 };
 
 type RaceLap = {
@@ -224,6 +245,21 @@ export default function Home() {
 
   const [raceLaps, setRaceLaps] =
     useState<RaceLap[]>([]);
+
+  const [stints, setStints] =
+    useState<DriverStint[]>([]);
+
+  const [raceEvents, setRaceEvents] =
+    useState<RaceEvent[]>([]);
+
+  const [historyDriverFilter, setHistoryDriverFilter] =
+    useState("all");
+
+  const [historyDateFilter, setHistoryDateFilter] =
+    useState("");
+
+  const [activityNote, setActivityNote] =
+    useState("");
 
   const [rcResultsUrl, setRcResultsUrl] =
     useState("");
@@ -1359,6 +1395,21 @@ export default function Home() {
           current_stint_started_at: nowIso,
         });
 
+        await db
+          .from("race_events")
+          .insert({
+            session_id: currentSession.id,
+            event_type: "battery_swap",
+            outgoing_driver_id:
+              currentRace.current_driver_id,
+            incoming_driver_id:
+              currentRace.current_driver_id,
+            notes: activityNote.trim() || null,
+          });
+
+        setActivityNote("");
+        void refreshHistory();
+
         return;
       }
 
@@ -1454,6 +1505,7 @@ export default function Home() {
               currentRace.current_driver_id,
             incoming_driver_id:
               incomingDriverId,
+            notes: activityNote.trim() || null,
           });
 
       if (eventError) {
@@ -1483,6 +1535,9 @@ export default function Home() {
         activity_rotation: nextActivityRotation,
         active_stint_id: newStint?.id ?? null,
       });
+
+      setActivityNote("");
+      void refreshHistory();
     };
 
 
@@ -2027,6 +2082,44 @@ export default function Home() {
   ]);
 
   /*
+   * Load completed stints and rotation events for history/reporting.
+   */
+  const refreshHistory =
+    useCallback(async () => {
+      const db = supabase.current;
+      const currentSession = session;
+
+      if (!db || !currentSession) return;
+
+      const [
+        { data: stintData },
+        { data: eventData },
+      ] = await Promise.all([
+        db
+          .from("driver_stints")
+          .select("*")
+          .eq("session_id", currentSession.id)
+          .order("started_at", { ascending: false }),
+        db
+          .from("race_events")
+          .select("*")
+          .eq("session_id", currentSession.id)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      setStints(
+        (stintData ?? []) as DriverStint[]
+      );
+      setRaceEvents(
+        (eventData ?? []) as RaceEvent[]
+      );
+    }, [session]);
+
+  useEffect(() => {
+    void refreshHistory();
+  }, [refreshHistory]);
+
+  /*
    * Leave session.
    */
   const leaveSession = () => {
@@ -2039,6 +2132,8 @@ export default function Home() {
     setLiveTeam(null);
     setLiveLaps([]);
     setRaceLaps([]);
+    setStints([]);
+    setRaceEvents([]);
     setMessage("");
     setShowShare(false);
 
@@ -2440,6 +2535,219 @@ export default function Home() {
         elapsed
     );
 
+  const completedStints = useMemo(
+    () =>
+      stints.filter(
+        (stintItem) => stintItem.ended_at
+      ),
+    [stints]
+  );
+
+  const filteredStints = useMemo(() => {
+    return completedStints.filter(
+      (stintItem) => {
+        const driverMatch =
+          historyDriverFilter === "all" ||
+          stintItem.driver_id === historyDriverFilter;
+
+        const dateMatch =
+          !historyDateFilter ||
+          stintItem.started_at.slice(0, 10) ===
+            historyDateFilter;
+
+        return driverMatch && dateMatch;
+      }
+    );
+  }, [
+    completedStints,
+    historyDriverFilter,
+    historyDateFilter,
+  ]);
+
+  const driverLoad = useMemo(
+    () =>
+      drivers.map((driver) => {
+        const totalSeconds =
+          stints
+            .filter(
+              (stintItem) =>
+                stintItem.driver_id === driver.id
+            )
+            .reduce(
+              (total, stintItem) => {
+                const end =
+                  stintItem.ended_at
+                    ? new Date(
+                        stintItem.ended_at
+                      ).getTime()
+                    : Date.now();
+
+                return (
+                  total +
+                  Math.max(
+                    0,
+                    Math.floor(
+                      (end -
+                        new Date(
+                          stintItem.started_at
+                        ).getTime()) /
+                        1000
+                    )
+                  )
+                );
+              },
+              0
+            );
+
+        return {
+          driver,
+          totalSeconds,
+        };
+      }),
+    [drivers, stints]
+  );
+
+  const currentStintLaps = useMemo(
+    () =>
+      race?.active_stint_id
+        ? raceLaps.filter(
+            (lap) =>
+              lap.stint_id ===
+              race.active_stint_id
+          )
+        : [],
+    [race, raceLaps]
+  );
+
+  const exportResults = () => {
+    const rows = completedStints.map(
+      (stintItem) => {
+        const driver =
+          drivers.find(
+            (item) =>
+              item.id === stintItem.driver_id
+          );
+
+        const stintLaps =
+          raceLaps.filter(
+            (lap) =>
+              lap.stint_id === stintItem.id
+          );
+
+        const relatedNotes =
+          raceEvents
+            .filter(
+              (event) =>
+                event.created_at >=
+                  stintItem.started_at &&
+                (!stintItem.ended_at ||
+                  event.created_at <=
+                    stintItem.ended_at)
+            )
+            .map(
+              (event) =>
+                event.notes
+            )
+            .filter(Boolean)
+            .join(" | ");
+
+        const seconds =
+          stintItem.ended_at
+            ? Math.max(
+                0,
+                Math.floor(
+                  (new Date(
+                    stintItem.ended_at
+                  ).getTime() -
+                    new Date(
+                      stintItem.started_at
+                    ).getTime()) /
+                    1000
+                )
+              )
+            : 0;
+
+        return {
+          Driver: driver?.name ?? "Unknown",
+          "Stint started": new Date(
+            stintItem.started_at
+          ).toLocaleString(),
+          "Stint ended": stintItem.ended_at
+            ? new Date(
+                stintItem.ended_at
+              ).toLocaleString()
+            : "",
+          "Total stint time": fmt(seconds),
+          "Lap count": stintLaps.length,
+          "Lap times": stintLaps
+            .map(
+              (lap) =>
+                fmtLap(
+                  lap.lap_time_seconds
+                )
+            )
+            .join(", "),
+          Notes: relatedNotes,
+        };
+      }
+    );
+
+    const loadRows = driverLoad.map(
+      (item) => ({
+        Driver: item.driver.name,
+        "Total track time":
+          fmt(item.totalSeconds),
+      })
+    );
+
+    const rotationRows = raceEvents.map(
+      (event) => ({
+        Timestamp: new Date(
+          event.created_at
+        ).toLocaleString(),
+        Event: event.event_type
+          .replaceAll("_", " "),
+        Outgoing:
+          drivers.find(
+            (driver) =>
+              driver.id ===
+              event.outgoing_driver_id
+          )?.name ?? "",
+        Incoming:
+          drivers.find(
+            (driver) =>
+              driver.id ===
+              event.incoming_driver_id
+          )?.name ?? "",
+        Notes: event.notes ?? "",
+      })
+    );
+
+    const workbook =
+      XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(rows),
+      "Stints"
+    );
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(loadRows),
+      "Driver Summary"
+    );
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(rotationRows),
+      "Rotation History"
+    );
+
+    XLSX.writeFile(
+      workbook,
+      `rc-endurance-${session?.session_code ?? "results"}.xlsx`
+    );
+  };
+
   const shareLink =
     getShareLink();
 
@@ -2580,6 +2888,18 @@ export default function Home() {
           <b>
             STINT {fmt(stint)}
           </b>
+
+          <div className="activityNote">
+            <input
+              value={activityNote}
+              onChange={(event) =>
+                setActivityNote(
+                  event.target.value
+                )
+              }
+              placeholder="Optional change note"
+            />
+          </div>
 
           <div className="swap">
             <button
@@ -3273,6 +3593,104 @@ export default function Home() {
           </div>
         </div>
       )}
+
+
+      {/* CURRENT STINT PACE */}
+      <section className="card historySection">
+        <div className="titleRow">
+          <span>CURRENT STINT PACE</span>
+          <small>{currentStintLaps.length} laps</small>
+        </div>
+        {currentStintLaps.length < 2 ? (
+          <p className="muted">Complete at least two laps to see the pace chart.</p>
+        ) : (
+          <svg className="paceChart" viewBox="0 0 600 220" role="img" aria-label="Current stint lap time chart">
+            {(() => {
+              const values = currentStintLaps.map((lap) => lap.lap_time_seconds);
+              const min = Math.min(...values);
+              const max = Math.max(...values);
+              const range = Math.max(0.001, max - min);
+              const points = values.map((value, index) => {
+                const x = values.length === 1 ? 300 : 20 + (index / (values.length - 1)) * 560;
+                const y = 20 + ((max - value) / range) * 170;
+                return `${x},${y}`;
+              }).join(" ");
+              return <polyline fill="none" stroke="var(--accent)" strokeWidth="3" points={points} />;
+            })()}
+          </svg>
+        )}
+      </section>
+
+      {/* DRIVER LOAD SUMMARY */}
+      <section className="card historySection">
+        <div className="titleRow">
+          <span>DRIVER LOAD SUMMARY</span>
+          <button onClick={exportResults}>EXPORT EXCEL</button>
+        </div>
+        <div className="loadGrid">
+          {driverLoad.map((item) => (
+            <div className="loadCard" key={item.driver.id}>
+              <strong>{item.driver.name}</strong>
+              <b>{fmt(item.totalSeconds)}</b>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* STINT HISTORY */}
+      <section className="card historySection">
+        <div className="titleRow">
+          <span>STINT HISTORY</span>
+          <small>{filteredStints.length} completed</small>
+        </div>
+        <div className="historyFilters">
+          <select value={historyDriverFilter} onChange={(event) => setHistoryDriverFilter(event.target.value)}>
+            <option value="all">All drivers</option>
+            {drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
+          </select>
+          <input type="date" value={historyDateFilter} onChange={(event) => setHistoryDateFilter(event.target.value)} />
+          <button onClick={() => { setHistoryDriverFilter("all"); setHistoryDateFilter(""); }}>CLEAR</button>
+        </div>
+        <div className="historyTableWrap">
+          <table className="historyTable">
+            <thead><tr><th>Driver</th><th>Date</th><th>Time</th><th>Laps</th><th>Lap times</th></tr></thead>
+            <tbody>
+              {filteredStints.map((stintItem) => {
+                const driver = drivers.find((item) => item.id === stintItem.driver_id);
+                const stintLaps = raceLaps.filter((lap) => lap.stint_id === stintItem.id);
+                const duration = stintItem.ended_at ? Math.max(0, Math.floor((new Date(stintItem.ended_at).getTime() - new Date(stintItem.started_at).getTime()) / 1000)) : 0;
+                return <tr key={stintItem.id}><td>{driver?.name ?? "Unknown"}</td><td>{new Date(stintItem.started_at).toLocaleDateString()}</td><td>{fmt(duration)}</td><td>{stintLaps.length}</td><td>{stintLaps.map((lap) => fmtLap(lap.lap_time_seconds)).join(", ") || "--"}</td></tr>;
+              })}
+              {filteredStints.length === 0 && <tr><td colSpan={5}>No completed stints match the selected filters.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* ROTATION HISTORY */}
+      <section className="card historySection">
+        <div className="titleRow">
+          <span>ROTATION HISTORY</span>
+          <small>{raceEvents.length} events</small>
+        </div>
+        <div className="historyTableWrap">
+          <table className="historyTable">
+            <thead><tr><th>Timestamp</th><th>Event</th><th>Outgoing</th><th>Incoming</th><th>Notes</th></tr></thead>
+            <tbody>
+              {raceEvents.map((event) => (
+                <tr key={event.id}>
+                  <td>{new Date(event.created_at).toLocaleString()}</td>
+                  <td>{event.event_type.replaceAll("_", " ")}</td>
+                  <td>{drivers.find((driver) => driver.id === event.outgoing_driver_id)?.name ?? "--"}</td>
+                  <td>{drivers.find((driver) => driver.id === event.incoming_driver_id)?.name ?? "--"}</td>
+                  <td>{event.notes ?? ""}</td>
+                </tr>
+              ))}
+              {raceEvents.length === 0 && <tr><td colSpan={5}>No driver swaps or battery changes recorded yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   );
 }
