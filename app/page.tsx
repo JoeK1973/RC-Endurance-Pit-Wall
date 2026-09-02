@@ -72,7 +72,6 @@ type LiveTeam = {
   lastLap?: number | null;
   bestLap?: number | null;
   averageLap?: number | null;
-  resultTotal?: number | null;
   driverResultUrl?: string | null;
 };
 
@@ -225,11 +224,6 @@ export default function Home() {
 
   const [raceLaps, setRaceLaps] =
     useState<RaceLap[]>([]);
-
-  /* Previous RC-Results Result value. This lets us calculate
-   * the latest lap as: current total - previous total. */
-  const previousResultRef =
-    useRef<{ laps: number; total: number } | null>(null);
 
   const [rcResultsUrl, setRcResultsUrl] =
     useState("");
@@ -705,39 +699,30 @@ export default function Home() {
 
   /*
    * Add driver.
-   *
-   * This function is deliberately independent of live timing,
-   * the driver queue and activity rotation.
    */
   const addDriver =
     async () => {
-      const currentSession = session;
-      const currentRace = race;
-      const driverName = newDriver.trim();
-      const db = supabase.current;
+      const currentSession =
+        session;
 
-      if (!currentSession) {
-        setMessage(
-          "No active session. Please create or join a session first."
-        );
+      const currentRace =
+        race;
+
+      const name =
+        newDriver.trim();
+
+      if (
+        !currentSession ||
+        !currentRace ||
+        !name
+      ) {
         return;
       }
 
-      if (!driverName) {
-        setMessage(
-          "Please enter a driver name."
-        );
-        return;
-      }
+      const db =
+        supabase.current;
 
-      if (!db) {
-        setMessage(
-          "Supabase is not configured."
-        );
-        return;
-      }
-
-      setMessage("");
+      if (!db) return;
 
       const {
         data,
@@ -747,60 +732,27 @@ export default function Home() {
         .insert({
           session_id:
             currentSession.id,
-          name:
-            driverName,
+          name,
         })
         .select()
         .single();
 
       if (error) {
-        console.error(
-          "Could not add driver:",
-          error
-        );
-
         setMessage(
-          `Could not save driver: ${error.message}`
+          error.message
         );
         return;
       }
 
-      if (!data) {
-        setMessage(
-          "Driver was not returned after saving."
-        );
-        return;
-      }
-
-      /*
-       * Update immediately so this does not depend on Realtime.
-       */
-      setDrivers(
-        (currentDrivers) => {
-          if (
-            currentDrivers.some(
-              (driver) =>
-                driver.id === data.id
-            )
-          ) {
-            return currentDrivers;
-          }
-
-          return [
-            ...currentDrivers,
-            data as Driver,
-          ];
-        }
-      );
+      if (!data) return;
 
       setNewDriver("");
 
       /*
-       * If this is the first driver, assign them to the race.
-       * The driver itself remains saved even if this follow-up fails.
+       * First driver becomes
+       * current driver.
        */
       if (
-        currentRace &&
         !currentRace.current_driver_id
       ) {
         const nowIso =
@@ -814,10 +766,8 @@ export default function Home() {
           .insert({
             session_id:
               currentSession.id,
-            driver_id:
-              data.id,
-            started_at:
-              nowIso,
+            driver_id: data.id,
+            started_at: nowIso,
             start_lap:
               raceLaps.length,
           })
@@ -825,26 +775,21 @@ export default function Home() {
           .single();
 
         if (stintError) {
-          console.error(
-            "Could not create first stint:",
-            stintError
-          );
-
           setMessage(
-            `Driver saved, but the first stint could not be created: ${stintError.message}`
+            stintError.message
           );
           return;
         }
 
-        const {
-          error: raceError,
-        } = await db
+        await db
           .from("races")
           .update({
             current_driver_id:
               data.id,
+
             current_stint_started_at:
               nowIso,
+
             active_stint_id:
               newStint?.id ??
               null,
@@ -853,29 +798,6 @@ export default function Home() {
             "id",
             currentRace.id
           );
-
-        if (raceError) {
-          console.error(
-            "Could not set current driver:",
-            raceError
-          );
-
-          setMessage(
-            `Driver saved, but could not set them as the current driver: ${raceError.message}`
-          );
-          return;
-        }
-
-        setRace({
-          ...currentRace,
-          current_driver_id:
-            data.id,
-          current_stint_started_at:
-            nowIso,
-          active_stint_id:
-            newStint?.id ??
-            null,
-        });
       }
     };
 
@@ -919,83 +841,121 @@ export default function Home() {
     };
 
   /*
-   * Add driver to queue.
-   * Duplicate entries allowed.
+   * Add one driver occurrence to the queue.
+   * Duplicates are intentionally allowed.
    */
   const addQueue =
     async (
       driverId: string
     ) => {
-      const currentSession =
-        session;
+      const currentSession = session;
+      const db = supabase.current;
 
       if (!currentSession) {
+        setMessage(
+          "No active session. Please create or join a session first."
+        );
         return;
       }
 
-      const db =
-        supabase.current;
+      if (!db) {
+        setMessage("Supabase is not configured.");
+        return;
+      }
 
-      if (!db) return;
-
-      const highestPosition =
+      const nextPosition =
         queue.reduce(
-          (
-            highest,
-            item
-          ) =>
+          (highest, item) =>
             Math.max(
               highest,
-              item.position
+              Number(item.position) || 0
             ),
           0
+        ) + 1;
+
+      const {
+        data,
+        error,
+      } = await db
+        .from("driver_queue")
+        .insert({
+          session_id:
+            currentSession.id,
+          driver_id:
+            driverId,
+          position:
+            nextPosition,
+        })
+        .select()
+        .single();
+
+      if (error || !data) {
+        console.error(
+          "Could not add driver to queue:",
+          error
         );
-
-      const { error } =
-        await db
-          .from("driver_queue")
-          .insert({
-            session_id:
-              currentSession.id,
-            driver_id:
-              driverId,
-            position:
-              highestPosition + 1,
-          });
-
-      if (error) {
         setMessage(
-          error.message
+          error?.message ??
+            "Could not add driver to queue."
         );
+        return;
       }
+
+      setMessage("");
+
+      // Update immediately without depending on Realtime.
+      setQueue(
+        (currentQueue) =>
+          [
+            ...currentQueue,
+            data as QueueItem,
+          ].sort(
+            (a, b) =>
+              Number(a.position) -
+              Number(b.position)
+          )
+      );
     };
 
   /*
-   * Remove exactly one queue entry.
+   * Remove exactly one queue occurrence.
+   * Queue item id is used so duplicate drivers remain independent.
    */
   const removeQueue =
     async (
       queueItemId: string
     ) => {
-      const db =
-        supabase.current;
+      const db = supabase.current;
 
-      if (!db) return;
+      if (!db) {
+        setMessage("Supabase is not configured.");
+        return;
+      }
 
       const { error } =
         await db
           .from("driver_queue")
           .delete()
-          .eq(
-            "id",
-            queueItemId
-          );
+          .eq("id", queueItemId);
 
       if (error) {
-        setMessage(
-          error.message
+        console.error(
+          "Could not remove queue item:",
+          error
         );
+        setMessage(error.message);
+        return;
       }
+
+      setMessage("");
+
+      setQueue(
+        (currentQueue) =>
+          currentQueue.filter(
+            (item) =>
+              item.id !== queueItemId
+          )
+      );
     };
 
   /*
@@ -1474,13 +1434,7 @@ export default function Home() {
           return;
         }
 
-        const nextActivityRotation =
-          (currentRace.activity_rotation ?? 0) +
-          1;
-
-        const {
-          error: raceUpdateError,
-        } = await db
+        await db
           .from("races")
           .update({
             current_driver_id:
@@ -1490,7 +1444,8 @@ export default function Home() {
               nowIso,
 
             activity_rotation:
-              nextActivityRotation,
+              currentRace.activity_rotation +
+              1,
 
             active_stint_id:
               newStint?.id ??
@@ -1500,34 +1455,6 @@ export default function Home() {
             "id",
             currentRace.id
           );
-
-        if (raceUpdateError) {
-          setMessage(
-            raceUpdateError.message
-          );
-          return;
-        }
-
-        /*
-         * IMPORTANT:
-         * Update React state immediately after the database succeeds.
-         * Current Driver and Activity Tracker both read from `race`,
-         * so they must not wait for a later reload or Realtime event.
-         *
-         * No timer, driver, queue or live RC-Results code is changed.
-         */
-        setRace({
-          ...currentRace,
-          current_driver_id:
-            incomingDriverId,
-          current_stint_started_at:
-            nowIso,
-          activity_rotation:
-            nextActivityRotation,
-          active_stint_id:
-            newStint?.id ??
-            null,
-        });
       }
     };
 
@@ -1704,8 +1631,6 @@ export default function Home() {
         data
       );
 
-      previousResultRef.current = null;
-
       setMessage(
         `Now tracking ${selectedTeamName}.`
       );
@@ -1755,7 +1680,6 @@ export default function Home() {
 
       setLiveTeam(null);
       setLiveLaps([]);
-      previousResultRef.current = null;
 
       setMessage(
         "RC-Results tracking stopped."
@@ -1856,85 +1780,37 @@ export default function Home() {
             );
           }
 
-          let incomingLaps: LiveLap[] =
-            Array.isArray(data.lapData)
+          const incomingLaps: LiveLap[] =
+            Array.isArray(
+              data.lapData
+            )
               ? data.lapData
-                  .map((lap: LiveLap) => ({
-                    lapNumber: Number(lap.lapNumber),
-                    lapTime: Number(lap.lapTime),
-                  }))
-                  .filter((lap: LiveLap) =>
-                    Number.isFinite(lap.lapNumber) &&
-                    lap.lapNumber > 0 &&
-                    Number.isFinite(lap.lapTime) &&
-                    lap.lapTime > 0
+                  .map(
+                    (
+                      lap: LiveLap
+                    ) => ({
+                      lapNumber:
+                        Number(
+                          lap.lapNumber
+                        ),
+                      lapTime:
+                        Number(
+                          lap.lapTime
+                        ),
+                    })
+                  )
+                  .filter(
+                    (lap: LiveLap) =>
+                      Number.isFinite(
+                        lap.lapNumber
+                      ) &&
+                      lap.lapNumber > 0 &&
+                      Number.isFinite(
+                        lap.lapTime
+                      ) &&
+                      lap.lapTime > 0
                   )
               : [];
-
-          /*
-           * RC-Results supplies Result as LAP_COUNT / TOTAL_TIME.
-           * Example: 9 / 135.12 -> 10 / 150.15 gives a 15.03 lap.
-           * The first poll is only used as a baseline; no historical
-           * lap is invented.
-           */
-          if (
-            incomingLaps.length === 0 &&
-            data.team
-          ) {
-            const currentLaps = Number(data.team.laps);
-            const currentTotal = Number(data.team.resultTotal);
-
-            if (
-              Number.isFinite(currentLaps) &&
-              currentLaps >= 0 &&
-              Number.isFinite(currentTotal) &&
-              currentTotal >= 0
-            ) {
-              const previous = previousResultRef.current;
-
-              if (!previous) {
-                previousResultRef.current = {
-                  laps: currentLaps,
-                  total: currentTotal,
-                };
-              } else if (currentLaps === previous.laps + 1) {
-                const lapTime = currentTotal - previous.total;
-
-                previousResultRef.current = {
-                  laps: currentLaps,
-                  total: currentTotal,
-                };
-
-                if (
-                  Number.isFinite(lapTime) &&
-                  lapTime > 0
-                ) {
-                  incomingLaps = [{
-                    lapNumber: currentLaps,
-                    lapTime,
-                  }];
-                }
-              } else if (currentLaps > previous.laps) {
-                /* If polling misses more than one lap, update the
-                 * baseline rather than storing an incorrect combined lap. */
-                previousResultRef.current = {
-                  laps: currentLaps,
-                  total: currentTotal,
-                };
-              } else if (currentLaps < previous.laps) {
-                /* Race/restart/reset detected. */
-                previousResultRef.current = {
-                  laps: currentLaps,
-                  total: currentTotal,
-                };
-              } else {
-                previousResultRef.current = {
-                  laps: currentLaps,
-                  total: currentTotal,
-                };
-              }
-            }
-          }
 
           setLiveLaps(
             incomingLaps
@@ -2398,53 +2274,6 @@ export default function Home() {
     };
 
   /*
-   * Live RC-Results statistics calculated from laps captured
-   * by this dashboard.
-   */
-  const liveLapTimes =
-    raceLaps
-      .map((lap) => Number(lap.lap_time_seconds))
-      .filter(
-        (lapTime) =>
-          Number.isFinite(lapTime) &&
-          lapTime > 0
-      );
-
-  const storedLastLap =
-    liveLapTimes.length > 0
-      ? liveLapTimes[liveLapTimes.length - 1]
-      : null;
-
-  const storedBestLap =
-    liveLapTimes.length > 0
-      ? Math.min(...liveLapTimes)
-      : null;
-
-  const storedAverageLap =
-    liveLapTimes.length > 0
-      ? liveLapTimes.reduce(
-          (total, lapTime) =>
-            total + lapTime,
-          0
-        ) / liveLapTimes.length
-      : null;
-
-  const displayLastLap =
-    storedLastLap ??
-    liveTeam?.lastLap ??
-    null;
-
-  const displayBestLap =
-    storedBestLap ??
-    liveTeam?.bestLap ??
-    null;
-
-  const displayAverageLap =
-    storedAverageLap ??
-    liveTeam?.averageLap ??
-    null;
-
-  /*
    * Current driver's
    * current stint laps.
    */
@@ -2903,7 +2732,7 @@ export default function Home() {
 
                   <b>
                     {fmtLap(
-                      displayLastLap
+                      liveTeam?.lastLap
                     )}
                   </b>
                 </div>
@@ -2915,7 +2744,7 @@ export default function Home() {
 
                   <b>
                     {fmtLap(
-                      displayBestLap
+                      liveTeam?.bestLap
                     )}
                   </b>
                 </div>
@@ -2927,7 +2756,7 @@ export default function Home() {
 
                   <b>
                     {fmtLap(
-                      displayAverageLap
+                      liveTeam?.averageLap
                     )}
                   </b>
                 </div>
