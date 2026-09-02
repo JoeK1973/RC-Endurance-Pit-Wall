@@ -668,3 +668,392 @@ li button {
     padding: 12px;
   }
 }
+
+/* =========================================
+   RC-RESULTS LIVE TRACKING
+   ========================================= */
+
+.rcUrlInput {
+  width: 100%;
+  margin: 12px 0 8px;
+  padding: 11px;
+}
+
+.liveButton {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.teamPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.teamPicker p {
+  margin: 4px 0;
+  font-size: .75rem;
+  letter-spacing: .1em;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.teamPicker button {
+  text-align: left;
+}
+
+.teamPicker button.primary {
+  text-align: center;
+  margin-top: 6px;
+}
+
+.selectedTeam {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--soft);
+}
+
+
+/* =========================================
+   LIVE RESULTS STATS
+   ========================================= */
+
+.liveStats h2 {
+  margin: 8px 0;
+  font-size: 1.35rem;
+}
+
+.liveStats small {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.liveStatGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.liveStatGrid div {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.liveStatGrid span {
+  display: block;
+  font-size: .65rem;
+  letter-spacing: .08em;
+  font-weight: 800;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.liveStatGrid b {
+  display: block;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================
+   DRIVER INFORMATION + STATISTICS
+   ========================================= */
+
+.driverInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.driverInfo button {
+  width: 100%;
+  text-align: left;
+}
+
+.driverInfo small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: .75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================
+   LAP LIST
+   ========================================= */
+
+.lapList {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.lapRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.lapRow span {
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+
+.lapRow b {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================
+   ACTIVITY TRACKER
+   ========================================= */
+
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.activityRow strong {
+  display: block;
+}
+
+.activityRow small {
+  display: block;
+  margin-top: 3px;
+  font-size: .65rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.activityStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activityStatus span {
+  font-size: 1.2rem;
+}
+
+.activityStatus b {
+  font-size: .8rem;
+  letter-spacing: .04em;
+}
+
+
+/* Highlight current driver */
+
+.activeDriver {
+  border-color: var(--accent);
+  background: var(--soft);
+}
+
+
+/* Activity states */
+
+.activityRow.drive {
+  border-left: 4px solid var(--accent);
+}
+
+.activityRow.rest {
+  opacity: .75;
+}
+
+.activityRow.pit {
+  border-left: 4px solid #e0a800;
+}
+
+.activityRow.marshal {
+  border-left: 4px solid #16803c;
+}
+
+
+/* =========================================
+   SHARE MODAL
+   ========================================= */
+
+.shareOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+
+.shareModal {
+  width: min(100%, 520px);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.shareHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.shareHeader span {
+  font-size: .7rem;
+  letter-spacing: .12em;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.shareHeader h2 {
+  margin: 6px 0 0;
+  letter-spacing: .08em;
+}
+
+.closeButton {
+  padding: 5px 10px;
+  font-size: 1.4rem;
+}
+
+.shareActions {
+  margin: 20px 0 12px;
+}
+
+.shareActions button {
+  width: 100%;
+}
+
+.shareLink {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  font-size: .8rem;
+  word-break: break-all;
+  color: var(--muted);
+}
+
+.qrSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 24px 0;
+}
+
+.qrSection p {
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  color: var(--muted);
+}
+
+.qrCode {
+  background: white;
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.closeShareButton {
+  width: 100%;
+}
+
+
+/* =========================================
+   WELCOME / CREATE SESSION
+   ========================================= */
+
+.welcome {
+  max-width: 600px;
+  margin: 60px auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 28px;
+}
+
+.welcome h2 {
+  margin-top: 0;
+}
+
+.big {
+  width: 100%;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.join {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.join input {
+  flex: 1;
+  width: auto;
+  padding: 12px;
+  text-transform: uppercase;
+}
+
+.message {
+  color: var(--accent);
+  font-weight: 700;
+  margin-top: 16px;
+}
+
+
+/* =========================================
+   MOBILE
+   ========================================= */
+
+@media (max-width: 600px) {
+
+  .liveStatGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .join {
+    flex-direction: column;
+  }
+
+  .join input,
+  .join button {
+    width: 100%;
+  }
+
+  .shareModal {
+    padding: 18px;
+  }
+
+  .qrCode svg {
+    width: min(220px, 70vw);
+    height: auto;
+  }
+
+  .activityRow {
+    padding: 10px;
+  }
+
+  .activityStatus {
+    gap: 5px;
+  }
+}
