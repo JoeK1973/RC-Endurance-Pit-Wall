@@ -2409,6 +2409,78 @@ export default function Home() {
           race?.active_stint_id
     );
 
+  const completedStints = useMemo(
+    () =>
+      stints.filter(
+        (stintItem) => stintItem.ended_at
+      ),
+    [stints]
+  );
+
+  const filteredStints = useMemo(() => {
+    return completedStints.filter(
+      (stintItem) => {
+        const driverMatch =
+          historyDriverFilter === "all" ||
+          stintItem.driver_id === historyDriverFilter;
+
+        const dateMatch =
+          !historyDateFilter ||
+          stintItem.started_at.slice(0, 10) ===
+            historyDateFilter;
+
+        return driverMatch && dateMatch;
+      }
+    );
+  }, [
+    completedStints,
+    historyDriverFilter,
+    historyDateFilter,
+  ]);
+
+  const driverLoad = useMemo(
+    () =>
+      drivers.map((driver) => {
+        const totalSeconds =
+          stints
+            .filter(
+              (stintItem) =>
+                stintItem.driver_id === driver.id
+            )
+            .reduce(
+              (total, stintItem) => {
+                const end =
+                  stintItem.ended_at
+                    ? new Date(
+                        stintItem.ended_at
+                      ).getTime()
+                    : Date.now();
+
+                return (
+                  total +
+                  Math.max(
+                    0,
+                    Math.floor(
+                      (end -
+                        new Date(
+                          stintItem.started_at
+                        ).getTime()) /
+                        1000
+                    )
+                  )
+                );
+              },
+              0
+            );
+
+        return {
+          driver,
+          totalSeconds,
+        };
+      }),
+    [drivers, stints]
+  );
+
   /*
    * Join/create screen.
    */
@@ -2535,77 +2607,7 @@ export default function Home() {
         elapsed
     );
 
-  const completedStints = useMemo(
-    () =>
-      stints.filter(
-        (stintItem) => stintItem.ended_at
-      ),
-    [stints]
-  );
 
-  const filteredStints = useMemo(() => {
-    return completedStints.filter(
-      (stintItem) => {
-        const driverMatch =
-          historyDriverFilter === "all" ||
-          stintItem.driver_id === historyDriverFilter;
-
-        const dateMatch =
-          !historyDateFilter ||
-          stintItem.started_at.slice(0, 10) ===
-            historyDateFilter;
-
-        return driverMatch && dateMatch;
-      }
-    );
-  }, [
-    completedStints,
-    historyDriverFilter,
-    historyDateFilter,
-  ]);
-
-  const driverLoad = useMemo(
-    () =>
-      drivers.map((driver) => {
-        const totalSeconds =
-          stints
-            .filter(
-              (stintItem) =>
-                stintItem.driver_id === driver.id
-            )
-            .reduce(
-              (total, stintItem) => {
-                const end =
-                  stintItem.ended_at
-                    ? new Date(
-                        stintItem.ended_at
-                      ).getTime()
-                    : Date.now();
-
-                return (
-                  total +
-                  Math.max(
-                    0,
-                    Math.floor(
-                      (end -
-                        new Date(
-                          stintItem.started_at
-                        ).getTime()) /
-                        1000
-                    )
-                  )
-                );
-              },
-              0
-            );
-
-        return {
-          driver,
-          totalSeconds,
-        };
-      }),
-    [drivers, stints]
-  );
 
   const exportResults = () => {
     const rows = completedStints.map(
