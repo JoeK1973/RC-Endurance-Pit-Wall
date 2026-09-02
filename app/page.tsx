@@ -705,71 +705,60 @@ export default function Home() {
 
   /*
    * Add driver.
-   *
-   * This does not touch live RC-Results tracking. A driver only
-   * requires an active session; the race row may temporarily be null.
    */
   const addDriver =
     async () => {
-      const currentSession = session;
-      const currentRace = race;
-      const name = newDriver.trim();
-      const db = supabase.current;
+      const currentSession =
+        session;
 
-      if (!currentSession) {
+      const currentRace =
+        race;
+
+      const name =
+        newDriver.trim();
+
+      if (
+        !currentSession ||
+        !currentRace ||
+        !name
+      ) {
+        return;
+      }
+
+      const db =
+        supabase.current;
+
+      if (!db) return;
+
+      const {
+        data,
+        error,
+      } = await db
+        .from("drivers")
+        .insert({
+          session_id:
+            currentSession.id,
+          name,
+        })
+        .select()
+        .single();
+
+      if (error) {
         setMessage(
-          "No active session. Please create or join a session first."
+          error.message
         );
         return;
       }
 
-      if (!name) {
-        setMessage("Please enter a driver name.");
-        return;
-      }
-
-      if (!db) {
-        setMessage("Supabase is not configured.");
-        return;
-      }
-
-      setMessage("");
-
-      const { data, error } =
-        await db
-          .from("drivers")
-          .insert({
-            session_id: currentSession.id,
-            name,
-          })
-          .select()
-          .single();
-
-      if (error || !data) {
-        setMessage(
-          error?.message ??
-            "Could not save driver."
-        );
-        return;
-      }
-
-      // Show the saved driver immediately; do not rely on Realtime.
-      setDrivers((current) =>
-        current.some(
-          (driver) => driver.id === data.id
-        )
-          ? current
-          : [
-              ...current,
-              data as Driver,
-            ]
-      );
+      if (!data) return;
 
       setNewDriver("");
 
-      // If this is the first driver, assign them only when a race exists.
+      /*
+       * First driver becomes
+       * current driver.
+       */
       if (
-        currentRace &&
         !currentRace.current_driver_id
       ) {
         const nowIso =
@@ -781,46 +770,40 @@ export default function Home() {
         } = await db
           .from("driver_stints")
           .insert({
-            session_id: currentSession.id,
+            session_id:
+              currentSession.id,
             driver_id: data.id,
             started_at: nowIso,
-            start_lap: raceLaps.length,
+            start_lap:
+              raceLaps.length,
           })
           .select()
           .single();
 
         if (stintError) {
           setMessage(
-            `Driver saved, but the first stint could not be created: ${stintError.message}`
+            stintError.message
           );
           return;
         }
 
-        const { error: raceError } =
-          await db
-            .from("races")
-            .update({
-              current_driver_id: data.id,
-              current_stint_started_at: nowIso,
-              active_stint_id:
-                newStint?.id ?? null,
-            })
-            .eq("id", currentRace.id);
+        await db
+          .from("races")
+          .update({
+            current_driver_id:
+              data.id,
 
-        if (raceError) {
-          setMessage(
-            `Driver saved, but could not set them as current driver: ${raceError.message}`
+            current_stint_started_at:
+              nowIso,
+
+            active_stint_id:
+              newStint?.id ??
+              null,
+          })
+          .eq(
+            "id",
+            currentRace.id
           );
-          return;
-        }
-
-        setRace({
-          ...currentRace,
-          current_driver_id: data.id,
-          current_stint_started_at: nowIso,
-          active_stint_id:
-            newStint?.id ?? null,
-        });
       }
     };
 
@@ -864,102 +847,83 @@ export default function Home() {
     };
 
   /*
-   * Add one occurrence of a driver to the queue.
-   * The same driver may be added any number of times.
+   * Add driver to queue.
+   * Duplicate entries allowed.
    */
   const addQueue =
     async (
       driverId: string
     ) => {
-      const currentSession = session;
-      const db = supabase.current;
+      const currentSession =
+        session;
 
       if (!currentSession) {
-        setMessage(
-          "No active session. Please create or join a session first."
-        );
         return;
       }
 
-      if (!db) {
-        setMessage("Supabase is not configured.");
-        return;
-      }
+      const db =
+        supabase.current;
 
-      setMessage("");
+      if (!db) return;
 
       const highestPosition =
         queue.reduce(
-          (highest, item) =>
+          (
+            highest,
+            item
+          ) =>
             Math.max(
               highest,
-              Number(item.position) || 0
+              item.position
             ),
           0
         );
 
-      const { data, error } =
+      const { error } =
         await db
           .from("driver_queue")
           .insert({
-            session_id: currentSession.id,
-            driver_id: driverId,
-            position: highestPosition + 1,
-          })
-          .select("id, driver_id, position")
-          .single();
+            session_id:
+              currentSession.id,
+            driver_id:
+              driverId,
+            position:
+              highestPosition + 1,
+          });
 
-      if (error || !data) {
+      if (error) {
         setMessage(
-          error?.message ??
-            "Could not add driver to queue."
+          error.message
         );
-        return;
       }
-
-      // Update locally immediately.
-      setQueue((current) =>
-        [
-          ...current,
-          data as QueueItem,
-        ].sort(
-          (a, b) =>
-            Number(a.position) -
-            Number(b.position)
-        )
-      );
     };
 
   /*
-   * Remove one exact queue occurrence.
+   * Remove exactly one queue entry.
    */
   const removeQueue =
     async (
       queueItemId: string
     ) => {
-      const db = supabase.current;
+      const db =
+        supabase.current;
 
-      if (!db) {
-        setMessage("Supabase is not configured.");
-        return;
-      }
+      if (!db) return;
 
       const { error } =
         await db
           .from("driver_queue")
           .delete()
-          .eq("id", queueItemId);
+          .eq(
+            "id",
+            queueItemId
+          );
 
       if (error) {
-        setMessage(error.message);
-        return;
+        setMessage(
+          error.message
+        );
       }
-
-      setQueue((current) =>
-        current.filter(
-          (item) => item.id !== queueItemId
-        )
-      );
     };
 
   /*
@@ -1315,13 +1279,6 @@ export default function Home() {
           return;
         }
 
-        setQueue((current) =>
-          current.filter(
-            (item) =>
-              item.id !== firstQueueItem.id
-          )
-        );
-
         /*
          * Add outgoing driver
          * to the back of queue.
@@ -1445,7 +1402,13 @@ export default function Home() {
           return;
         }
 
-        await db
+        const nextActivityRotation =
+          (currentRace.activity_rotation ?? 0) +
+          1;
+
+        const {
+          error: raceUpdateError,
+        } = await db
           .from("races")
           .update({
             current_driver_id:
@@ -1455,8 +1418,7 @@ export default function Home() {
               nowIso,
 
             activity_rotation:
-              currentRace.activity_rotation +
-              1,
+              nextActivityRotation,
 
             active_stint_id:
               newStint?.id ??
@@ -1466,6 +1428,34 @@ export default function Home() {
             "id",
             currentRace.id
           );
+
+        if (raceUpdateError) {
+          setMessage(
+            raceUpdateError.message
+          );
+          return;
+        }
+
+        /*
+         * IMPORTANT:
+         * Update React state immediately after the database succeeds.
+         * Current Driver and Activity Tracker both read from `race`,
+         * so they must not wait for a later reload or Realtime event.
+         *
+         * No timer, driver, queue or live RC-Results code is changed.
+         */
+        setRace({
+          ...currentRace,
+          current_driver_id:
+            incomingDriverId,
+          current_stint_started_at:
+            nowIso,
+          activity_rotation:
+            nextActivityRotation,
+          active_stint_id:
+            newStint?.id ??
+            null,
+        });
       }
     };
 
