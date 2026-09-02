@@ -6,6 +6,7 @@ import { createClient, hasSupabase } from "@/lib/supabase/client";
 type Driver = {
   id: string;
   name: string;
+  created_at?: string;
 };
 
 type QueueItem = {
@@ -19,10 +20,13 @@ type Session = {
   session_code: string;
 };
 
+type RaceStatus = "idle" | "running" | "paused" | "finished";
+
 type Race = {
   id: string;
+  session_id: string;
   duration_seconds: number;
-  status: "idle" | "running" | "paused" | "finished";
+  status: RaceStatus;
   started_at: string | null;
   paused_at: string | null;
   accumulated_pause_seconds: number;
@@ -31,63 +35,12 @@ type Race = {
   activity_rotation: number;
 };
 
-const fmt = (seconds: number) => {
-  const safeSeconds = Math.max(0, Math.floor(seconds));
-
-  const hours = Math.floor(safeSeconds / 3600);
-  const minutes = Math.floor((safeSeconds % 3600) / 60);
-  const secs = safeSeconds % 60;
-
-  if (hours > 0) {
-    return `${String(hours).padStart(2, "0")}:${String(
-      minutes
-    ).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  }
-
-  return `${String(minutes).padStart(2, "0")}:${String(
-    secs
-  ).padStart(2, "0")}`;
-};
-
-const secondsSince = (iso: string | null) => {
-  if (!iso) return 0;
-
-  return Math.max(
-    0,
-    Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  );
-};
-
 type Activity = {
   name: string;
   icon: string;
   className: string;
 };
 
-/*
- * Activity order around the team.
-
- * Relative to the current driver:
- *
- * Current driver = DRIVE
- * Next driver    = REST
- * Next driver    = PIT
- * Next driver    = MARSHAL
- *
- * This produces:
- *
- * Driver 1 driving:
- * D1 Drive
- * D2 Rest
- * D3 Pit
- * D4 Marshal
- *
- * Driver 2 driving:
- * D1 Marshal
- * D2 Drive
- * D3 Rest
- * D4 Pit
- */
 const ACTIVITIES: Activity[] = [
   {
     name: "Drive",
@@ -111,7 +64,30 @@ const ACTIVITIES: Activity[] = [
   },
 ];
 
+const fmt = (seconds: number) => {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const secs = safeSeconds % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(
+    minutes
+  ).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+};
+
+const secondsSince = (iso: string | null, now: number) => {
+  if (!iso) return 0;
+
+  return Math.max(
+    0,
+    Math.floor((now - new Date(iso).getTime()) / 1000)
+  );
+};
+
 export default function Home() {
+  const supabase = useRef<any>(null);
+
   const [session, setSession] = useState<Session | null>(null);
   const [race, setRace] = useState<Race | null>(null);
 
@@ -122,11 +98,10 @@ export default function Home() {
   const [newDriver, setNewDriver] = useState("");
 
   const [now, setNow] = useState(Date.now());
+
   const [dark, setDark] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-
-  const supabase = useRef<any>(null);
 
   /*
    * Initialise Supabase
@@ -138,18 +113,20 @@ export default function Home() {
   }, []);
 
   /*
-   * Update timers
+   * Live clock
    */
   useEffect(() => {
-    const timer = setInterval(() => {
+    const timer = window.setInterval(() => {
       setNow(Date.now());
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+    };
   }, []);
 
   /*
-   * Light / dark mode
+   * Theme
    */
   useEffect(() => {
     document.documentElement.dataset.theme = dark
@@ -158,14 +135,14 @@ export default function Home() {
   }, [dark]);
 
   /*
-   * Load a race session
+   * Load session from Supabase
    */
   const loadSession = async (code: string) => {
     const db = supabase.current;
 
     if (!db) {
       setMessage(
-        "Add your Supabase environment variables first."
+        "Supabase is not configured."
       );
       return;
     }
@@ -173,7 +150,9 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    const normalized = code.trim().toUpperCase();
+    const normalizedCode = code
+      .trim()
+      .toUpperCase();
 
     const {
       data: sessionData,
@@ -181,14 +160,18 @@ export default function Home() {
     } = await db
       .from("race_sessions")
       .select("*")
-      .eq("session_code", normalized)
+      .eq(
+        "session_code",
+        normalizedCode
+      )
       .single();
 
     if (sessionError || !sessionData) {
       setLoading(false);
 
       setMessage(
-        "Session not found. Check the share code."
+        sessionError?.message ??
+          "Session not found."
       );
 
       return;
@@ -200,14 +183,18 @@ export default function Home() {
     } = await db
       .from("races")
       .select("*")
-      .eq("session_id", sessionData.id)
+      .eq(
+        "session_id",
+        sessionData.id
+      )
       .single();
 
     if (raceError || !raceData) {
       setLoading(false);
 
       setMessage(
-        "Race data could not be loaded."
+        raceError?.message ??
+          "Race data could not be loaded."
       );
 
       return;
@@ -216,25 +203,55 @@ export default function Home() {
     const { data: driverData } = await db
       .from("drivers")
       .select("*")
-      .eq("session_id", sessionData.id)
+      .eq(
+        "session_id",
+        sessionData.id
+      )
       .order("created_at");
 
     const { data: queueData } = await db
       .from("driver_queue")
-      .select("id, driver_id, position")
-      .eq("session_id", sessionData.id)
+      .select(
+        "id, driver_id, position"
+      )
+      .eq(
+        "session_id",
+        sessionData.id
+      )
       .order("position");
 
-    setSession(sessionData);
+    const loadedSession: Session = {
+      id: sessionData.id,
+      session_code:
+        sessionData.session_code,
+    };
 
-    setRace({
-      ...raceData,
+    const loadedRace: Race = {
+      id: raceData.id,
+      session_id: raceData.session_id,
+      duration_seconds:
+        raceData.duration_seconds,
+      status:
+        raceData.status as RaceStatus,
+      started_at:
+        raceData.started_at,
+      paused_at:
+        raceData.paused_at,
+      accumulated_pause_seconds:
+        raceData.accumulated_pause_seconds ??
+        0,
+      current_driver_id:
+        raceData.current_driver_id,
+      current_stint_started_at:
+        raceData.current_stint_started_at,
       activity_rotation:
-        raceData.activity_rotation ?? 0,
-    });
+        raceData.activity_rotation ??
+        0,
+    };
 
+    setSession(loadedSession);
+    setRace(loadedRace);
     setDrivers(driverData ?? []);
-
     setQueue(queueData ?? []);
 
     setLoading(false);
@@ -242,24 +259,25 @@ export default function Home() {
     window.history.replaceState(
       null,
       "",
-      `/?session=${sessionData.session_code}`
+      `/?session=${loadedSession.session_code}`
     );
   };
 
   /*
-   * Load session from URL
+   * Load a session code from the URL
    */
   useEffect(() => {
-    const sessionCode =
-      new URLSearchParams(
-        window.location.search
-      ).get("session");
+    if (!supabase.current) return;
 
-    if (
-      sessionCode &&
-      supabase.current
-    ) {
-      loadSession(sessionCode);
+    const params = new URLSearchParams(
+      window.location.search
+    );
+
+    const sessionCode =
+      params.get("session");
+
+    if (sessionCode) {
+      void loadSession(sessionCode);
     }
   }, []);
 
@@ -267,19 +285,22 @@ export default function Home() {
    * Realtime updates
    */
   useEffect(() => {
-    if (!session || !supabase.current) {
-      return;
-    }
+    if (!session) return;
 
     const db = supabase.current;
 
+    if (!db) return;
+
     const refreshSession = () => {
-      loadSession(session.session_code);
+      void loadSession(
+        session.session_code
+      );
     };
 
     const channel = db
-      .channel(`race-${session.id}`)
-
+      .channel(
+        `race-session-${session.id}`
+      )
       .on(
         "postgres_changes",
         {
@@ -290,7 +311,6 @@ export default function Home() {
         },
         refreshSession
       )
-
       .on(
         "postgres_changes",
         {
@@ -301,7 +321,6 @@ export default function Home() {
         },
         refreshSession
       )
-
       .on(
         "postgres_changes",
         {
@@ -312,23 +331,22 @@ export default function Home() {
         },
         refreshSession
       )
-
       .subscribe();
 
     return () => {
-      db.removeChannel(channel);
+      void db.removeChannel(channel);
     };
-  }, [session?.id]);
+  }, [session?.id, session?.session_code]);
 
   /*
-   * Create a new session
+   * Create session
    */
   const createSession = async () => {
     const db = supabase.current;
 
     if (!db) {
       setMessage(
-        "Add your Supabase environment variables first."
+        "Supabase is not configured."
       );
       return;
     }
@@ -336,8 +354,12 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    const { data, error } =
-      await db.rpc("create_race_session");
+    const {
+      data,
+      error,
+    } = await db.rpc(
+      "create_race_session"
+    );
 
     if (error || !data) {
       setLoading(false);
@@ -350,32 +372,43 @@ export default function Home() {
       return;
     }
 
-    await loadSession(data.session_code);
+    await loadSession(
+      data.session_code
+    );
   };
 
   /*
    * Add driver
    */
   const addDriver = async () => {
+    const currentSession = session;
+    const currentRace = race;
+    const driverName =
+      newDriver.trim();
+
     if (
-      !session ||
-      !race ||
-      !newDriver.trim()
+      !currentSession ||
+      !currentRace ||
+      !driverName
     ) {
       return;
     }
 
     const db = supabase.current;
 
-    if (!db) {
-      return;
-    }
+    if (!db) return;
 
-    const { data, error } = await db
+    setMessage("");
+
+    const {
+      data,
+      error,
+    } = await db
       .from("drivers")
       .insert({
-        session_id: session.id,
-        name: newDriver.trim(),
+        session_id:
+          currentSession.id,
+        name: driverName,
       })
       .select()
       .single();
@@ -385,25 +418,32 @@ export default function Home() {
       return;
     }
 
-    if (!data) {
-      return;
-    }
+    if (!data) return;
 
     setNewDriver("");
 
-    /*
-     * First driver becomes
-     * the current driver.
-     */
-    if (!race.current_driver_id) {
-      await db
-        .from("races")
-        .update({
-          current_driver_id: data.id,
-          current_stint_started_at:
-            new Date().toISOString(),
-        })
-        .eq("id", race.id);
+    if (
+      !currentRace.current_driver_id
+    ) {
+      const { error: updateError } =
+        await db
+          .from("races")
+          .update({
+            current_driver_id:
+              data.id,
+            current_stint_started_at:
+              new Date().toISOString(),
+          })
+          .eq(
+            "id",
+            currentRace.id
+          );
+
+      if (updateError) {
+        setMessage(
+          updateError.message
+        );
+      }
     }
   };
 
@@ -413,62 +453,65 @@ export default function Home() {
   const editDriver = async (
     driver: Driver
   ) => {
-    const newName = prompt(
+    const updatedName = prompt(
       "Driver name",
       driver.name
     );
 
-    if (!newName?.trim()) {
+    if (!updatedName?.trim()) {
       return;
     }
 
     const db = supabase.current;
 
-    if (!db) {
-      return;
-    }
+    if (!db) return;
 
-    await db
+    const { error } = await db
       .from("drivers")
       .update({
-        name: newName.trim(),
+        name: updatedName.trim(),
       })
       .eq("id", driver.id);
+
+    if (error) {
+      setMessage(error.message);
+    }
   };
 
   /*
-   * Add a driver to the queue.
-
-   * Duplicates are intentionally allowed.
+   * Add to queue.
+   *
+   * Duplicate entries are allowed.
    */
   const addQueue = async (
     driverId: string
   ) => {
-    if (!session) {
-      return;
-    }
+    const currentSession = session;
+
+    if (!currentSession) return;
 
     const db = supabase.current;
 
-    if (!db) {
-      return;
-    }
+    if (!db) return;
 
-    const nextPosition =
-      queue.length > 0
-        ? Math.max(
-            ...queue.map(
-              (item) => item.position
-            )
-          ) + 1
-        : 1;
+    const highestPosition =
+      queue.reduce(
+        (highest, item) =>
+          Math.max(
+            highest,
+            item.position
+          ),
+        0
+      );
 
     const { error } = await db
       .from("driver_queue")
       .insert({
-        session_id: session.id,
+        session_id:
+          currentSession.id,
         driver_id: driverId,
-        position: nextPosition,
+        position:
+          highestPosition + 1,
       });
 
     if (error) {
@@ -477,19 +520,18 @@ export default function Home() {
   };
 
   /*
-   * Remove one specific queue entry.
+   * Remove one queue entry.
    *
-   * This works correctly even when the
-   * same driver appears multiple times.
+   * This uses the queue entry ID rather
+   * than the driver ID, so duplicates
+   * work correctly.
    */
   const removeQueue = async (
     queueItemId: string
   ) => {
     const db = supabase.current;
 
-    if (!db) {
-      return;
-    }
+    if (!db) return;
 
     const { error } = await db
       .from("driver_queue")
@@ -507,20 +549,21 @@ export default function Home() {
   const updateRace = async (
     updates: Partial<Race>
   ) => {
-    if (!race) {
-      return;
-    }
+    const currentRace = race;
+
+    if (!currentRace) return;
 
     const db = supabase.current;
 
-    if (!db) {
-      return;
-    }
+    if (!db) return;
 
     const { error } = await db
       .from("races")
       .update(updates)
-      .eq("id", race.id);
+      .eq(
+        "id",
+        currentRace.id
+      );
 
     if (error) {
       setMessage(error.message);
@@ -528,22 +571,26 @@ export default function Home() {
   };
 
   /*
-   * Start / resume race
+   * Start / resume
    */
   const startRace = async () => {
-    if (!race) {
-      return;
-    }
+    const currentRace = race;
+
+    if (!currentRace) return;
 
     const nowIso =
       new Date().toISOString();
 
-    if (race.status === "idle") {
+    if (
+      currentRace.status === "idle"
+    ) {
       await updateRace({
         status: "running",
         started_at: nowIso,
+        paused_at: null,
+        accumulated_pause_seconds: 0,
         current_stint_started_at:
-          race.current_stint_started_at ??
+          currentRace.current_stint_started_at ??
           nowIso,
       });
 
@@ -551,35 +598,41 @@ export default function Home() {
     }
 
     if (
-      race.status === "paused" &&
-      race.paused_at
+      currentRace.status ===
+        "paused" &&
+      currentRace.paused_at
     ) {
-      const pausedSeconds =
-        Math.floor(
-          (Date.now() -
-            new Date(
-              race.paused_at
-            ).getTime()) /
-            1000
+      const pauseSeconds =
+        Math.max(
+          0,
+          Math.floor(
+            (Date.now() -
+              new Date(
+                currentRace.paused_at
+              ).getTime()) /
+              1000
+          )
         );
 
       await updateRace({
         status: "running",
         paused_at: null,
         accumulated_pause_seconds:
-          race.accumulated_pause_seconds +
-          pausedSeconds,
+          currentRace.accumulated_pause_seconds +
+          pauseSeconds,
       });
     }
   };
 
   /*
-   * Pause race
+   * Pause
    */
   const pauseRace = async () => {
+    const currentRace = race;
+
     if (
-      !race ||
-      race.status !== "running"
+      !currentRace ||
+      currentRace.status !== "running"
     ) {
       return;
     }
@@ -592,21 +645,19 @@ export default function Home() {
   };
 
   /*
-   * Reset race
+   * Reset
    */
   const resetRace = async () => {
-    if (!race) {
-      return;
-    }
+    const currentRace = race;
+
+    if (!currentRace) return;
 
     const confirmed =
       window.confirm(
         "Are you sure you want to reset this race?"
       );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     await updateRace({
       status: "idle",
@@ -619,7 +670,8 @@ export default function Home() {
   };
 
   /*
-   * Complete a battery and/or driver swap.
+   * Battery swap / driver swap /
+   * combined full change
    */
   const swap = async (
     type:
@@ -627,27 +679,33 @@ export default function Home() {
       | "driver_swap"
       | "full_swap"
   ) => {
-    if (!session || !race) {
+    const currentSession = session;
+    const currentRace = race;
+
+    if (
+      !currentSession ||
+      !currentRace
+    ) {
       return;
     }
 
     const db = supabase.current;
 
-    if (!db) {
-      return;
-    }
+    if (!db) return;
+
+    setMessage("");
 
     const firstQueueItem =
-      queue[0] ?? null;
-
-    const nowIso =
-      new Date().toISOString();
+      queue.length > 0
+        ? queue[0]
+        : null;
 
     let incomingDriverId =
-      race.current_driver_id;
+      currentRace.current_driver_id;
 
     /*
-     * Driver change
+     * Driver changes require a driver
+     * at the front of the queue.
      */
     if (type !== "battery_swap") {
       if (!firstQueueItem) {
@@ -662,163 +720,201 @@ export default function Home() {
         firstQueueItem.driver_id;
 
       /*
-       * Remove ONLY the first queue entry.
-       *
-       * Important for duplicate drivers.
+       * Remove only this queue entry.
        */
-      const { error: removeError } =
-        await db
-          .from("driver_queue")
-          .delete()
-          .eq(
-            "id",
-            firstQueueItem.id
-          );
+      const {
+        error: deleteError,
+      } = await db
+        .from("driver_queue")
+        .delete()
+        .eq(
+          "id",
+          firstQueueItem.id
+        );
 
-      if (removeError) {
+      if (deleteError) {
         setMessage(
-          removeError.message
+          deleteError.message
         );
 
         return;
       }
 
       /*
-       * Add outgoing driver to the
+       * Put outgoing driver at the
        * back of the queue.
        */
-      if (race.current_driver_id) {
-        const nextPosition =
-          queue.length > 0
-            ? Math.max(
-                ...queue.map(
-                  (item) =>
-                    item.position
-                )
-              ) + 1
-            : 1;
+      if (
+        currentRace.current_driver_id
+      ) {
+        const highestPosition =
+          queue.reduce(
+            (highest, item) =>
+              Math.max(
+                highest,
+                item.position
+              ),
+            0
+          );
 
-        await db
-          .from("driver_queue")
-          .insert({
-            session_id:
-              session.id,
+        const { error: insertError } =
+          await db
+            .from("driver_queue")
+            .insert({
+              session_id:
+                currentSession.id,
+              driver_id:
+                currentRace.current_driver_id,
+              position:
+                highestPosition + 1,
+            });
 
-            driver_id:
-              race.current_driver_id,
+        if (insertError) {
+          setMessage(
+            insertError.message
+          );
 
-            position:
-              nextPosition,
-          });
+          return;
+        }
       }
     }
 
     /*
-     * Record event
+     * Record activity
      */
-    await db
+    const {
+      error: eventError,
+    } = await db
       .from("race_events")
       .insert({
-        session_id: session.id,
-
+        session_id:
+          currentSession.id,
         event_type: type,
-
         outgoing_driver_id:
-          race.current_driver_id,
-
+          currentRace.current_driver_id,
         incoming_driver_id:
           incomingDriverId,
       });
 
-    /*
-     * Start new stint.
-
-     * Battery-only changes reset the stint
-     * but do not change activities.
-     */
-    const updates: Partial<Race> = {
-      current_driver_id:
-        incomingDriverId,
-
-      current_stint_started_at:
-        nowIso,
-    };
-
-    /*
-     * Advance the activity rotation
-     * only when the driver changes.
-     */
-    if (type !== "battery_swap") {
-      updates.activity_rotation =
-        (race.activity_rotation + 1) %
-        Math.max(drivers.length, 1);
+    if (eventError) {
+      setMessage(
+        eventError.message
+      );
     }
 
-    await updateRace(updates);
+    /*
+     * Every battery change starts a new
+     * stint. A driver change also moves
+     * the current driver.
+     */
+    const raceUpdates: Partial<Race> =
+      {
+        current_driver_id:
+          incomingDriverId,
+        current_stint_started_at:
+          new Date().toISOString(),
+      };
+
+    if (type !== "battery_swap") {
+      raceUpdates.activity_rotation =
+        currentRace.activity_rotation +
+        1;
+    }
+
+    await updateRace(raceUpdates);
   };
 
   /*
-   * Calculate elapsed race time
+   * Race elapsed time
    */
-  const elapsed = race?.started_at
-    ? Math.max(
-        0,
-        Math.floor(
-          (now -
-            new Date(
-              race.started_at
-            ).getTime()) /
-            1000
-        ) -
-          race.accumulated_pause_seconds -
-          (race.status === "paused" &&
+  const elapsed = (() => {
+    if (!race?.started_at) {
+      return 0;
+    }
+
+    const startedAt =
+      new Date(
+        race.started_at
+      ).getTime();
+
+    let totalSeconds =
+      Math.floor(
+        (now - startedAt) / 1000
+      ) -
+      race.accumulated_pause_seconds;
+
+    if (
+      race.status === "paused" &&
+      race.paused_at
+    ) {
+      const pauseStartedAt =
+        new Date(
           race.paused_at
-            ? Math.floor(
-                (now -
-                  new Date(
-                    race.paused_at
-                  ).getTime()) /
-                  1000
-              )
-            : 0)
-      )
-    : 0;
+        ).getTime();
+
+      totalSeconds -= Math.floor(
+        (now - pauseStartedAt) /
+          1000
+      );
+    }
+
+    return Math.max(
+      0,
+      totalSeconds
+    );
+  })();
 
   /*
-   * Current stint
+   * Stint time
    */
-  const stint =
-    race?.current_stint_started_at
-      ? secondsSince(
-          race.current_stint_started_at
-        )
-      : 0;
+  const stint = secondsSince(
+    race?.current_stint_started_at ??
+      null,
+    now
+  );
 
+  /*
+   * Current driver
+   */
   const currentDriver =
     drivers.find(
       (driver) =>
         driver.id ===
         race?.current_driver_id
-    );
+    ) ?? null;
 
   /*
-   * Activity calculation
+   * Activity tracker.
    *
-   * The current driver is always
-   * at position 0 = DRIVE.
+   * The current driver is Drive.
    *
-   * The other drivers rotate around them:
+   * Looking forward through the driver
+   * list from the current driver:
    *
-   * 0 Drive
-   * 1 Rest
-   * 2 Pit
-   * 3 Marshal
+   * Drive -> Rest -> Pit -> Marshal
+   *
+   * This produces:
+   *
+   * Driver 1 current:
+   * D1 Drive
+   * D2 Rest
+   * D3 Pit
+   * D4 Marshal
+   *
+   * Driver 2 current:
+   * D1 Marshal
+   * D2 Drive
+   * D3 Rest
+   * D4 Pit
    */
   const getActivityForDriver = (
     driverId: string
   ): Activity => {
+    const currentDriverId =
+      race?.current_driver_id;
+
     if (
-      !race?.current_driver_id ||
+      !currentDriverId ||
       drivers.length === 0
     ) {
       return ACTIVITIES[1];
@@ -828,7 +924,7 @@ export default function Home() {
       drivers.findIndex(
         (driver) =>
           driver.id ===
-          race.current_driver_id
+          currentDriverId
       );
 
     const driverIndex =
@@ -844,20 +940,12 @@ export default function Home() {
       return ACTIVITIES[1];
     }
 
-    /*
-     * Work out the driver's position
-     * relative to the current driver.
-     */
     const relativePosition =
       (driverIndex -
         currentIndex +
         drivers.length) %
       drivers.length;
 
-    /*
-     * Activities repeat if more than
-     * four drivers are present.
-     */
     return ACTIVITIES[
       relativePosition %
         ACTIVITIES.length
@@ -865,12 +953,30 @@ export default function Home() {
   };
 
   /*
-   * Copy session code
+   * Set a driver manually.
+   *
+   * Useful before the race starts.
+   */
+  const setCurrentDriver = async (
+    driverId: string
+  ) => {
+    const currentRace = race;
+
+    if (!currentRace) return;
+
+    await updateRace({
+      current_driver_id:
+        driverId,
+      current_stint_started_at:
+        new Date().toISOString(),
+    });
+  };
+
+  /*
+   * Copy share code
    */
   const copyShareCode = async () => {
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
     try {
       await navigator.clipboard.writeText(
@@ -888,14 +994,33 @@ export default function Home() {
   };
 
   /*
-   * JOIN SCREEN
+   * Leave session
    */
-  if (!session) {
+  const leaveSession = () => {
+    setSession(null);
+    setRace(null);
+    setDrivers([]);
+    setQueue([]);
+    setMessage("");
+
+    window.history.replaceState(
+      null,
+      "",
+      "/"
+    );
+  };
+
+  /*
+   * JOIN / CREATE SCREEN
+   */
+  if (!session || !race) {
     return (
       <main>
         <header>
           <div>
-            <h1>RC ENDURANCE</h1>
+            <h1>
+              RC ENDURANCE
+            </h1>
 
             <p>
               Create or join a live race
@@ -906,20 +1031,27 @@ export default function Home() {
           <button
             className="icon"
             onClick={() =>
-              setDark(!dark)
+              setDark(
+                (value) => !value
+              )
             }
+            aria-label="Toggle theme"
           >
             {dark ? "☀" : "◐"}
           </button>
         </header>
 
         <section className="welcome">
-          <h2>CREATE OR JOIN</h2>
+          <h2>
+            CREATE OR JOIN
+          </h2>
 
           <button
             className="primary big"
             disabled={loading}
-            onClick={createSession}
+            onClick={() => {
+              void createSession();
+            }}
           >
             {loading
               ? "CREATING..."
@@ -934,14 +1066,29 @@ export default function Home() {
                   event.target.value
                 )
               }
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  !loading
+                ) {
+                  void loadSession(
+                    joinCode
+                  );
+                }
+              }}
               placeholder="ENTER SESSION CODE"
             />
 
             <button
-              disabled={loading}
-              onClick={() =>
-                loadSession(joinCode)
+              disabled={
+                loading ||
+                !joinCode.trim()
               }
+              onClick={() => {
+                void loadSession(
+                  joinCode
+                );
+              }}
             >
               JOIN SESSION
             </button>
@@ -965,13 +1112,25 @@ export default function Home() {
   }
 
   /*
-   * MAIN DASHBOARD
+   * race is guaranteed non-null below
+   * because of the return above.
    */
+  const activeRace = race;
+
+  const timeRemaining =
+    Math.max(
+      0,
+      activeRace.duration_seconds -
+        elapsed
+    );
+
   return (
     <main>
       <header>
         <div>
-          <h1>RC ENDURANCE</h1>
+          <h1>
+            RC ENDURANCE
+          </h1>
 
           <p>
             Session{" "}
@@ -980,24 +1139,15 @@ export default function Home() {
             </b>{" "}
 
             <button
-              onClick={copyShareCode}
+              onClick={() => {
+                void copyShareCode();
+              }}
             >
               COPY CODE
             </button>{" "}
 
             <button
-              onClick={() => {
-                setSession(null);
-                setRace(null);
-                setDrivers([]);
-                setQueue([]);
-
-                window.history.replaceState(
-                  null,
-                  "",
-                  "/"
-                );
-              }}
+              onClick={leaveSession}
             >
               LEAVE
             </button>
@@ -1007,14 +1157,15 @@ export default function Home() {
         <button
           className="icon"
           onClick={() =>
-            setDark(!dark)
+            setDark(
+              (value) => !value
+            )
           }
+          aria-label="Toggle theme"
         >
           {dark ? "☀" : "◐"}
         </button>
       </header>
-
-      {/* RACE TIMER */}
 
       <section className="hero">
         <div>
@@ -1033,36 +1184,47 @@ export default function Home() {
           </span>
 
           <strong>
-            {fmt(
-              race.duration_seconds -
-                elapsed
-            )}
+            {fmt(timeRemaining)}
           </strong>
         </div>
 
         <div className="controls">
           <button
             className="primary"
-            onClick={startRace}
+            disabled={
+              activeRace.status ===
+              "running"
+            }
+            onClick={() => {
+              void startRace();
+            }}
           >
-            {race.status ===
+            {activeRace.status ===
             "running"
               ? "RUNNING"
-              : race.status ===
+              : activeRace.status ===
                 "paused"
               ? "RESUME"
               : "START"}
           </button>
 
           <button
-            onClick={pauseRace}
+            disabled={
+              activeRace.status !==
+              "running"
+            }
+            onClick={() => {
+              void pauseRace();
+            }}
           >
             PAUSE
           </button>
 
           <button
             className="danger"
-            onClick={resetRace}
+            onClick={() => {
+              void resetRace();
+            }}
           >
             RESET
           </button>
@@ -1070,9 +1232,6 @@ export default function Home() {
       </section>
 
       <section className="grid">
-
-        {/* CURRENT DRIVER */}
-
         <article className="card current">
           <span>
             CURRENT DRIVER
@@ -1089,35 +1248,43 @@ export default function Home() {
 
           <div className="swap">
             <button
-              onClick={() =>
-                swap("battery_swap")
-              }
+              onClick={() => {
+                void swap(
+                  "battery_swap"
+                );
+              }}
             >
               🔋 BATTERY SWAP
             </button>
 
             <button
-              onClick={() =>
-                swap("driver_swap")
+              disabled={
+                queue.length === 0
               }
-              disabled={!queue.length}
+              onClick={() => {
+                void swap(
+                  "driver_swap"
+                );
+              }}
             >
               👤 DRIVER SWAP
             </button>
 
             <button
               className="full"
-              onClick={() =>
-                swap("full_swap")
+              disabled={
+                queue.length === 0
               }
-              disabled={!queue.length}
+              onClick={() => {
+                void swap(
+                  "full_swap"
+                );
+              }}
             >
               🔋 + 👤 FULL CHANGE
             </button>
           </div>
         </article>
-
-        {/* ACTIVITY TRACKER */}
 
         <article className="card activity">
           <div className="titleRow">
@@ -1131,6 +1298,13 @@ export default function Home() {
           </div>
 
           <div className="activityList">
+            {drivers.length === 0 && (
+              <p className="muted">
+                Add drivers to see the
+                activity rotation.
+              </p>
+            )}
+
             {drivers.map(
               (driver) => {
                 const activity =
@@ -1138,14 +1312,16 @@ export default function Home() {
                     driver.id
                   );
 
-                const isDriving =
+                const isCurrentDriver =
                   driver.id ===
-                  race.current_driver_id;
+                  activeRace.current_driver_id;
 
                 return (
                   <div
-                    className={`activityRow ${activity.className} ${
-                      isDriving
+                    className={`activityRow ${
+                      activity.className
+                    } ${
+                      isCurrentDriver
                         ? "activeDriver"
                         : ""
                     }`}
@@ -1156,7 +1332,7 @@ export default function Home() {
                         {driver.name}
                       </strong>
 
-                      {isDriving && (
+                      {isCurrentDriver && (
                         <small>
                           CURRENT DRIVER
                         </small>
@@ -1179,8 +1355,6 @@ export default function Home() {
           </div>
         </article>
 
-        {/* DRIVER QUEUE */}
-
         <article className="card">
           <div className="titleRow">
             <span>
@@ -1188,54 +1362,72 @@ export default function Home() {
             </span>
 
             <small>
-              Unlimited queue
+              {queue.length} queued
             </small>
           </div>
 
-          <ol>
-            {queue.map(
-              (queueItem, index) => {
-                const driver =
-                  drivers.find(
-                    (item) =>
-                      item.id ===
-                      queueItem.driver_id
-                  );
+          {queue.length === 0 ? (
+            <p className="muted">
+              Add drivers below. The same
+              driver can be added multiple
+              times.
+            </p>
+          ) : (
+            <ol>
+              {queue.map(
+                (
+                  queueItem,
+                  index
+                ) => {
+                  const driver =
+                    drivers.find(
+                      (item) =>
+                        item.id ===
+                        queueItem.driver_id
+                    );
 
-                return (
-                  <li
-                    key={queueItem.id}
-                  >
-                    <b>
-                      {index + 1}
-                    </b>
-
-                    {driver?.name ??
-                      "Unknown driver"}
-
-                    <button
-                      onClick={() =>
-                        removeQueue(
-                          queueItem.id
-                        )
+                  return (
+                    <li
+                      key={
+                        queueItem.id
                       }
                     >
-                      ×
-                    </button>
-                  </li>
-                );
-              }
-            )}
-          </ol>
+                      <b>
+                        {index + 1}
+                      </b>
+
+                      <span>
+                        {driver?.name ??
+                          "Unknown driver"}
+                      </span>
+
+                      <button
+                        onClick={() => {
+                          void removeQueue(
+                            queueItem.id
+                          );
+                        }}
+                        aria-label="Remove from queue"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  );
+                }
+              )}
+            </ol>
+          )}
 
           <div className="add">
             {drivers.map(
               (driver) => (
                 <button
                   key={driver.id}
-                  onClick={() =>
-                    addQueue(driver.id)
-                  }
+                  onClick={() => {
+                    void addQueue(
+                      driver.id
+                    );
+                  }}
                 >
                   + {driver.name}
                 </button>
@@ -1244,13 +1436,15 @@ export default function Home() {
           </div>
         </article>
 
-        {/* DRIVERS */}
-
         <article className="card">
           <div className="titleRow">
             <span>
               DRIVERS
             </span>
+
+            <small>
+              {drivers.length} drivers
+            </small>
           </div>
 
           <div className="addDriver">
@@ -1261,11 +1455,23 @@ export default function Home() {
                   event.target.value
                 )
               }
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter"
+                ) {
+                  void addDriver();
+                }
+              }}
               placeholder="Driver name"
             />
 
             <button
-              onClick={addDriver}
+              disabled={
+                !newDriver.trim()
+              }
+              onClick={() => {
+                void addDriver();
+              }}
             >
               ADD
             </button>
@@ -1284,23 +1490,22 @@ export default function Home() {
                       ? "selected"
                       : ""
                   }
-                  onClick={() =>
-                    updateRace({
-                      current_driver_id:
-                        driver.id,
-
-                      current_stint_started_at:
-                        new Date().toISOString(),
-                    })
-                  }
+                  onClick={() => {
+                    void setCurrentDriver(
+                      driver.id
+                    );
+                  }}
                 >
                   {driver.name}
                 </button>
 
                 <button
-                  onClick={() =>
-                    editDriver(driver)
-                  }
+                  onClick={() => {
+                    void editDriver(
+                      driver
+                    );
+                  }}
+                  aria-label={`Edit ${driver.name}`}
                 >
                   ✎
                 </button>
@@ -1309,23 +1514,28 @@ export default function Home() {
           )}
         </article>
 
-        {/* SESSION STATUS */}
-
         <article className="card history">
           <span>
             SESSION STATUS
           </span>
 
           <p>
-            Live Supabase
-            synchronisation is active.
+            Status:{" "}
+            <b>
+              {activeRace.status.toUpperCase()}
+            </b>
           </p>
 
           <p>
-            Share code:{" "}
+            Session code:{" "}
             <b>
               {session.session_code}
             </b>
+          </p>
+
+          <p className="muted">
+            Open this session on another
+            device using the same code.
           </p>
 
           {message && (
@@ -1334,7 +1544,6 @@ export default function Home() {
             </p>
           )}
         </article>
-
       </section>
     </main>
   );
