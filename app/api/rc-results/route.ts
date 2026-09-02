@@ -10,6 +10,7 @@ type LiveTeam = {
   lastLap: number | null;
   bestLap: number | null;
   averageLap: number | null;
+  resultTotal: number | null;
 };
 
 type LiveLap = {
@@ -61,10 +62,19 @@ const parseTime = (value?: string) => {
   return null;
 };
 
-const parseResultLaps = (value?: string) => {
-  if (!value) return null;
-  const match = value.match(/^\s*(\d+)\s*\//);
-  return match ? Number(match[1]) : null;
+const parseResult = (value?: string) => {
+  if (!value) return { laps: null, total: null };
+
+  const match = value.match(
+    /^\s*(\d+)\s*\/\s*(.+?)\s*$/
+  );
+
+  if (!match) return { laps: null, total: null };
+
+  return {
+    laps: Number(match[1]),
+    total: parseTime(match[2]),
+  };
 };
 
 function extractRows(html: string): string[][] {
@@ -138,13 +148,16 @@ function parseTeams(html: string): LiveTeam[] {
       continue;
     }
 
+    const resultData = parseResult(result);
+
     teams.push({
       name,
       position:
         positionIndex >= 0
           ? parseNumber(row[positionIndex])
           : null,
-      laps: parseResultLaps(result),
+      laps: resultData.laps,
+      resultTotal: resultData.total,
 
       /*
        * The supplied RC-Results table has no Last Lap column.
