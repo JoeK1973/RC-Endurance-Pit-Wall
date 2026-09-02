@@ -1482,6 +1482,25 @@ export default function Home() {
             }
           );
 
+        const contentType =
+          response.headers.get("content-type") ?? "";
+
+        if (
+          !contentType.includes("application/json")
+        ) {
+          const text =
+            await response.text();
+
+          console.error(
+            "RC-Results API returned non-JSON:",
+            text
+          );
+
+          throw new Error(
+            "The RC-Results API route returned HTML instead of JSON. Check that app/api/rc-results/route.ts exists and has deployed successfully."
+          );
+        }
+
         const data =
           await response.json();
 
@@ -1687,6 +1706,25 @@ export default function Home() {
                   "no-store",
               }
             );
+
+          const contentType =
+            response.headers.get("content-type") ?? "";
+
+          if (
+            !contentType.includes(
+              "application/json"
+            )
+          ) {
+            const text =
+              await response.text();
+
+            console.error(
+              "RC-Results polling returned non-JSON:",
+              text
+            );
+
+            return;
+          }
 
           const data =
             await response.json();
