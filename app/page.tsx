@@ -3003,21 +3003,9 @@ const stintLaps = raceLaps.filter(
         (item) => item.id === stintItem.driver_id
       );
 
-      const stintLaps = raceLaps
-        .filter(
-          (lap) => lap.stint_id === stintItem.id
-        )
-        .sort((a, b) => {
-          const aTime = a.created_at
-            ? new Date(a.created_at).getTime()
-            : 0;
-
-          const bTime = b.created_at
-            ? new Date(b.created_at).getTime()
-            : 0;
-
-          return aTime - bTime;
-        });
+      const stintLaps = raceLaps.filter(
+  (lap) => lap.stint_id === stintItem.id
+);
 
       return stintLaps.map((lap, index) => {
         const lapTime = Number(
