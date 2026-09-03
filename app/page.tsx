@@ -246,6 +246,11 @@ export default function Home() {
   const [raceLaps, setRaceLaps] =
     useState<RaceLap[]>([]);
 
+  const previousResultRef = useRef<{
+  laps: number;
+  total: number;
+} | null>(null);
+
   const [stints, setStints] =
     useState<DriverStint[]>([]);
 
@@ -1939,71 +1944,126 @@ useEffect(() => {
             );
           }
 
-          const incomingLaps: LiveLap[] =
-            Array.isArray(
-              data.lapData
-            )
-              ? data.lapData
-                  .map(
-                    (
-                      lap: LiveLap
-                    ) => ({
-                      lapNumber:
-                        Number(
-                          lap.lapNumber
-                        ),
-                      lapTime:
-                        Number(
-                          lap.lapTime
-                        ),
-                    })
-                  )
-                  .filter(
-                    (lap: LiveLap) =>
-                      Number.isFinite(
-                        lap.lapNumber
-                      ) &&
-                      lap.lapNumber > 0 &&
-                      Number.isFinite(
-                        lap.lapTime
-                      ) &&
-                      lap.lapTime > 0
-                  )
-              : [];
+let incomingLaps: LiveLap[] =
+  Array.isArray(data.lapData)
+    ? data.lapData
+        .map(
+          (lap: LiveLap) => ({
+            lapNumber: Number(
+              lap.lapNumber
+            ),
+            lapTime: Number(
+              lap.lapTime
+            ),
+          })
+        )
+        .filter(
+          (lap: LiveLap) =>
+            Number.isFinite(
+              lap.lapNumber
+            ) &&
+            lap.lapNumber > 0 &&
+            Number.isFinite(
+              lap.lapTime
+            ) &&
+            lap.lapTime > 0
+        )
+    : [];
 
-          setLiveLaps(
-            incomingLaps
-          );
-          if (
-            autoStartFromLive &&
-            currentRace.status === "idle" &&
-            incomingLaps.length > 0
-          ) {
-            await db.from("races").update({
-              status: "running",
-              started_at: new Date().toISOString(),
-              paused_at: null,
-              accumulated_pause_seconds: 0,
-            }).eq("id", currentRace.id);
-            setRace({
-              ...currentRace,
-              status: "running",
-              started_at: new Date().toISOString(),
-              paused_at: null,
-              accumulated_pause_seconds: 0,
-            });
-          }
+/*
+ * If RC-Results does not provide individual lap data,
+ * calculate the latest lap from the Result total.
+ *
+ * Example:
+ *
+ * Previous: 9 / 135.12
+ * Current:  10 / 150.15
+ *
+ * Latest lap: 15.03
+ */
+if (
+  incomingLaps.length === 0 &&
+  data.team
+) {
+  const currentLapNumber =
+    Number(data.team.laps);
 
-          /*
-           * If RC-Results is providing only the summary
-           * and no individual lap data, show the live
-           * total but do not pretend that laps were saved.
-           */
-          if (
-            incomingLaps.length === 0
-          ) {
-            return;
-          }
+  const currentTotalTime =
+    Number(data.team.resultTotal);
+
+  if (
+    Number.isFinite(
+      currentLapNumber
+    ) &&
+    currentLapNumber > 0 &&
+    Number.isFinite(
+      currentTotalTime
+    ) &&
+    currentTotalTime > 0
+  ) {
+    const previous =
+      previousResultRef.current;
+
+    /*
+     * First poll only establishes the baseline.
+     */
+    if (!previous) {
+      previousResultRef.current = {
+        laps: currentLapNumber,
+        total: currentTotalTime,
+      };
+    } else {
+      const lapDifference =
+        currentLapNumber -
+        previous.laps;
+
+      const lapTime =
+        currentTotalTime -
+        previous.total;
+
+      /*
+       * Always update the baseline.
+       */
+      previousResultRef.current = {
+        laps: currentLapNumber,
+        total: currentTotalTime,
+      };
+
+      /*
+       * If one new lap has appeared, create it.
+       */
+      if (
+        lapDifference === 1 &&
+        Number.isFinite(lapTime) &&
+        lapTime > 0
+      ) {
+        incomingLaps = [
+          {
+            lapNumber:
+              currentLapNumber,
+            lapTime,
+          },
+        ];
+      }
+    }
+  }
+}
+
+/*
+ * Keep the live lap display updated.
+ */
+setLiveLaps(
+  incomingLaps
+);
+
+/*
+ * No new lap detected yet.
+ */
+if (
+  incomingLaps.length === 0
+) {
+  return;
+}
 
           const existingLapNumbers =
             new Set(
