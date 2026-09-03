@@ -1169,3 +1169,17 @@ li button {
     font-size:1.35rem;
   }
 }
+
+.headerActions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.headerActions .icon{
+  width:44px;
+  height:44px;
+  padding:0;
+  display:grid;
+  place-items:center;
+}
