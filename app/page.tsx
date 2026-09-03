@@ -3232,7 +3232,6 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="liveColumnHelp"><span>POSITION</span><span>LAPS COMPLETED</span><span>LAST LAP</span><span>BEST LAP</span><span>AVERAGE LAP</span></div>
               <div className="liveStatGrid">
                 <div>
                   <span>
