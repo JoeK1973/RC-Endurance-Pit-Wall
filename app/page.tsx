@@ -2928,16 +2928,6 @@ export default function Home() {
             </b>{" "}
 
             <button
-              onClick={() =>
-                setShowShare(
-                  true
-                )
-              }
-            >
-              SHARE
-            </button>{" "}
-
-            <button
               onClick={
                 leaveSession
               }
@@ -2947,20 +2937,25 @@ export default function Home() {
           </p>
         </div>
 
-        <button
-          className="icon"
-          onClick={() =>
-            setDark(
-              (value) =>
-                !value
-            )
-          }
-          aria-label="Toggle theme"
-        >
-          {dark
-            ? "☀"
-            : "◐"}
-        </button>
+<div className="headerActions">
+  <button
+    className="icon"
+    onClick={() => setShowShare(true)}
+    aria-label="Share session"
+    title="Share session"
+  >
+    ↗
+  </button>
+
+  <button
+    className="icon"
+    onClick={() => setDark((value) => !value)}
+    aria-label="Toggle theme"
+    title="Toggle theme"
+  >
+    {dark ? "☀" : "◐"}
+  </button>
+</div>
       </header>
 
       <nav className="appTabs" aria-label="Dashboard sections">
