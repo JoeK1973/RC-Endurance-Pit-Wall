@@ -1444,11 +1444,31 @@ export default function Home() {
        * this makes the queue visibly move down and leaves the next
        * rotation entirely under the user's control.
        */
-      const firstQueueItem = queue[0];
+      /*
+       * A new session can occasionally have the current starting driver
+       * left at the front of the queue. Do not require a second button
+       * press: remove that stale entry and use the next queued driver
+       * immediately. We only skip it when there is another driver behind it,
+       * so a deliberate single-item queue is left untouched.
+       */
+      const currentDriverId =
+        currentRace.current_driver_id;
+
+      const staleStartingItem =
+        queue.length > 1 &&
+        currentDriverId &&
+        queue[0]?.driver_id === currentDriverId
+          ? queue[0]
+          : null;
+
+      const firstQueueItem =
+        staleStartingItem
+          ? queue[1]
+          : queue[0];
 
       if (!firstQueueItem) {
         setMessage(
-          "There is no driver in the queue."
+          "There is no next driver in the queue."
         );
         return;
       }
@@ -1465,11 +1485,22 @@ export default function Home() {
        */
       await closeCurrentStint();
 
+      const queueItemsToRemove =
+        staleStartingItem
+          ? [
+              staleStartingItem.id,
+              firstQueueItem.id,
+            ]
+          : [firstQueueItem.id];
+
       const { error: deleteError } =
         await db
           .from("driver_queue")
           .delete()
-          .eq("id", firstQueueItem.id);
+          .in(
+            "id",
+            queueItemsToRemove
+          );
 
       if (deleteError) {
         setMessage(deleteError.message);
@@ -1549,7 +1580,9 @@ export default function Home() {
         (currentQueue) =>
           currentQueue.filter(
             (item) =>
-              item.id !== firstQueueItem.id
+              !queueItemsToRemove.includes(
+                item.id
+              )
           )
       );
 
