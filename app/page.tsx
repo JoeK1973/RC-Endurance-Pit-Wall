@@ -319,6 +319,9 @@ export default function Home() {
 
   const [showShare, setShowShare] =
     useState(false);
+  
+  const [showSettings, setShowSettings] =
+  useState(false);
 
   /*
    * Initialise Supabase.
@@ -3233,6 +3236,15 @@ const stintLaps = raceLaps.filter(
 <div className="headerActions">
   <button
     className="icon"
+    onClick={() => setShowSettings(true)}
+    aria-label="Race settings"
+    title="Race settings"
+  >
+    ⚙
+  </button>
+
+  <button
+    className="icon"
     onClick={() => setShowShare(true)}
     aria-label="Share session"
     title="Share session"
@@ -3984,6 +3996,196 @@ const stintLaps = raceLaps.filter(
 
 
 </div>
+      {/* SETTINGS MODAL */}
+
+{showSettings && (
+  <div
+    className="shareOverlay"
+    onClick={() =>
+      setShowSettings(false)
+    }
+  >
+    <div
+      className="shareModal settingsModal"
+      onClick={(event) =>
+        event.stopPropagation()
+      }
+    >
+      <div className="shareHeader">
+        <div>
+          <span>
+            RACE SETTINGS
+          </span>
+
+          <h2>
+            Session Settings
+          </h2>
+        </div>
+
+        <button
+          className="closeButton"
+          onClick={() =>
+            setShowSettings(false)
+          }
+          aria-label="Close settings"
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="strategyInputs">
+
+        <label>
+          Race duration (min)
+          <input
+            type="number"
+            min="1"
+            value={
+              Math.max(
+                1,
+                Math.round(
+                  activeRace.duration_seconds /
+                    60
+                )
+              )
+            }
+            onChange={(event) => {
+              const minutes =
+                Math.max(
+                  1,
+                  Number(event.target.value) ||
+                    1
+                );
+
+              setStrategyRaceMinutes(
+                minutes
+              );
+
+              void updateRace({
+                duration_seconds:
+                  minutes * 60,
+              });
+            }}
+          />
+        </label>
+
+        <label>
+          Stint target (min)
+          <input
+            type="number"
+            min="1"
+            value={stintTargetMinutes}
+            onChange={(event) =>
+              setStintTargetMinutes(
+                Math.max(
+                  1,
+                  Number(
+                    event.target.value
+                  ) || 1
+                )
+              )
+            }
+          />
+        </label>
+
+        <label>
+          Alert trigger (min remaining)
+          <input
+            type="number"
+            min="0"
+            value={stintAlertMinutes}
+            onChange={(event) =>
+              setStintAlertMinutes(
+                Math.max(
+                  0,
+                  Number(
+                    event.target.value
+                  ) || 0
+                )
+              )
+            }
+          />
+        </label>
+
+        <label>
+          <input
+            type="checkbox"
+            checked={audioAlerts}
+            onChange={(event) =>
+              setAudioAlerts(
+                event.target.checked
+              )
+            }
+          />
+          Audio stint alert
+        </label>
+
+        <label>
+          <input
+            type="checkbox"
+            checked={autoStartFromLive}
+            onChange={(event) =>
+              setAutoStartFromLive(
+                event.target.checked
+              )
+            }
+          />
+          Start race when live laps arrive
+        </label>
+
+        <label>
+          <input
+            type="checkbox"
+            checked={showBatteryChange}
+            onChange={(event) =>
+              setShowBatteryChange(
+                event.target.checked
+              )
+            }
+          />
+          Show battery change
+        </label>
+
+        <label>
+          <input
+            type="checkbox"
+            checked={showDriverChange}
+            onChange={(event) =>
+              setShowDriverChange(
+                event.target.checked
+              )
+            }
+          />
+          Show driver change
+        </label>
+
+        <label>
+          <input
+            type="checkbox"
+            checked={showFullChange}
+            onChange={(event) =>
+              setShowFullChange(
+                event.target.checked
+              )
+            }
+          />
+          Show full change
+        </label>
+
+      </div>
+
+      <button
+        className="closeShareButton"
+        onClick={() =>
+          setShowSettings(false)
+        }
+      >
+        DONE
+      </button>
+    </div>
+  </div>
+)}
+      
       {/* SHARE MODAL */}
 
       {showShare && (
@@ -4115,7 +4317,6 @@ const stintLaps = raceLaps.filter(
       <section className="card strategyOnly historySection">
         <div className="titleRow"><span>OPTIMAL STRATEGY SIMULATOR</span><small>Comparison starts at 20 minutes</small></div>
         <div className="strategyInputs">
-          <label>Race duration (min)<input type="number" min="1" value={strategyRaceMinutes} onChange={e=>setStrategyRaceMinutes(Math.max(1,Number(e.target.value)||1))}/></label>
           <label>Average lap (s)<input type="number" min="0.1" step="0.001" value={strategyLapTime} onChange={e=>setStrategyLapTime(Math.max(.1,Number(e.target.value)||.1))}/></label>
           <label>Battery endurance (min)<input type="number" min="20" value={strategyBatteryMinutes} onChange={e=>setStrategyBatteryMinutes(Math.max(20,Number(e.target.value)||20))}/></label>
           <label>Swap time (s)<input type="number" min="0" value={strategySwapSeconds} onChange={e=>setStrategySwapSeconds(Math.max(0,Number(e.target.value)||0))}/></label>
@@ -4124,18 +4325,7 @@ const stintLaps = raceLaps.filter(
         <div className="historyTableWrap"><table className="historyTable"><thead><tr><th>Stint length</th><th>Changes</th><th>Swap loss</th><th>Projected laps</th></tr></thead><tbody>{strategyRows.map(row=><tr key={row.minutes}><td>{row.minutes} min</td><td>{row.stops}</td><td>{row.lostLaps.toFixed(2)} laps</td><td>{row.laps.toFixed(1)}</td></tr>)}</tbody></table></div>
       </section>
 
-      <section className="card strategyOnly historySection">
-        <div className="titleRow"><span>RACE SETTINGS</span></div>
-        <div className="strategyInputs">
-          <label>Stint target (min)<input type="number" min="1" value={stintTargetMinutes} onChange={e=>setStintTargetMinutes(Math.max(1,Number(e.target.value)||1))}/></label>
-          <label>Alert trigger (min remaining)<input type="number" min="0" value={stintAlertMinutes} onChange={e=>setStintAlertMinutes(Math.max(0,Number(e.target.value)||0))}/></label>
-          <label><input type="checkbox" checked={audioAlerts} onChange={e=>setAudioAlerts(e.target.checked)}/> Audio stint alert</label>
-          <label><input type="checkbox" checked={autoStartFromLive} onChange={e=>setAutoStartFromLive(e.target.checked)}/> Start race when live laps arrive</label>
-          <label><input type="checkbox" checked={showBatteryChange} onChange={e=>setShowBatteryChange(e.target.checked)}/> Show battery change</label>
-          <label><input type="checkbox" checked={showDriverChange} onChange={e=>setShowDriverChange(e.target.checked)}/> Show driver change</label>
-          <label><input type="checkbox" checked={showFullChange} onChange={e=>setShowFullChange(e.target.checked)}/> Show full change</label>
-        </div>
-      </section>
+
 
       {/* CURRENT STINT PACE */}
       <section className="card historySection analysisOnly">
