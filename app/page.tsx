@@ -2659,9 +2659,11 @@ export default function Home() {
       <main data-tab={activeTab}>
         <header>
           <div>
-            <h1>
-              RC ENDURANCE
-            </h1>
+<img
+  src="/logo-light-pw.png"
+  alt="RC Endurance Pit Wall"
+  className="siteLogo"
+/>
 
             <p>
               Create or join a
@@ -3194,9 +3196,11 @@ const stintLaps = raceLaps.filter(
     <main data-tab={activeTab}>
       <header>
         <div>
-          <h1>
-            RC ENDURANCE
-          </h1>
+<img
+  src="/logo-light-pw.png"
+  alt="RC Endurance Pit Wall"
+  className="siteLogo"
+/>
 
           <p>
             Session{" "}
