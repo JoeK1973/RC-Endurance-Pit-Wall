@@ -2662,16 +2662,16 @@ export default function Home() {
 <picture className="siteLogo">
   <source
     media="(prefers-color-scheme: dark)"
-    srcSet="/rc-endurance-logo-dark.png"
+    srcSet="/logo-dark-pw.png"
   />
 
   <source
     media="(prefers-color-scheme: light)"
-    srcSet="/rc-endurance-logo-light.png"
+    srcSet="/logo-light-pw.png"
   />
 
   <img
-    src="/rc-endurance-logo-light.png"
+    src="/logo-light-pw.png"
     alt="RC Endurance Pit Wall"
   />
 </picture>
@@ -3210,16 +3210,16 @@ const stintLaps = raceLaps.filter(
 <picture className="siteLogo">
   <source
     media="(prefers-color-scheme: dark)"
-    srcSet="/rc-endurance-logo-dark.png"
+    srcSet="/logo-dark-pw.png"
   />
 
   <source
     media="(prefers-color-scheme: light)"
-    srcSet="/rc-endurance-logo-light.png"
+    srcSet="/logo-light-pw.png"
   />
 
   <img
-    src="/rc-endurance-logo-light.png"
+    src="/logo-light-pw.png"
     alt="RC Endurance Pit Wall"
   />
 </picture>
