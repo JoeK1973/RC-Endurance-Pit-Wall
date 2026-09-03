@@ -3736,9 +3736,13 @@ const stintLaps = raceLaps.filter(
                   </span>
 
                   <b>
-                    {fmtLap(
-                      liveTeam?.lastLap
-                    )}
+{fmtLap(
+  liveLaps.length > 0
+    ? liveLaps[
+        liveLaps.length - 1
+      ].lapTime
+    : liveTeam?.lastLap
+)}
                   </b>
                 </div>
 
@@ -3748,9 +3752,15 @@ const stintLaps = raceLaps.filter(
                   </span>
 
                   <b>
-                    {fmtLap(
-                      liveTeam?.bestLap
-                    )}
+{fmtLap(
+  liveLaps.length > 0
+    ? Math.min(
+        ...liveLaps.map(
+          (lap) => lap.lapTime
+        )
+      )
+    : liveTeam?.bestLap
+)}
                   </b>
                 </div>
 
@@ -3760,9 +3770,15 @@ const stintLaps = raceLaps.filter(
                   </span>
 
                   <b>
-                    {fmtLap(
-                      liveTeam?.averageLap
-                    )}
+{fmtLap(
+  liveLaps.length > 0
+    ? liveLaps.reduce(
+        (total, lap) =>
+          total + lap.lapTime,
+        0
+      ) / liveLaps.length
+    : liveTeam?.averageLap
+)}
                   </b>
                 </div>
               </div>
