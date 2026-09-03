@@ -1107,3 +1107,65 @@ li button {
 .nextDriver strong{
   letter-spacing:0;
 }
+
+.driverStatusGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+  align-items:start;
+  margin:8px 0 24px;
+}
+
+.driverStatusCurrent,
+.driverStatusNext{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.driverStatusNext{
+  text-align:right;
+  align-items:flex-end;
+}
+
+.driverStatusCurrent span,
+.driverStatusNext span{
+  font-size:.72rem;
+  font-weight:800;
+  letter-spacing:.12em;
+  line-height:1;
+}
+
+.driverStatusCurrent span{
+  color:var(--muted);
+}
+
+.driverStatusNext span{
+  color:var(--accent);
+}
+
+.driverStatusCurrent strong,
+.driverStatusNext strong{
+  font-size:1.8rem;
+  font-weight:500;
+  line-height:1.1;
+}
+
+.driverStatusCurrent strong{
+  color:var(--text);
+}
+
+.driverStatusNext strong{
+  color:var(--accent);
+}
+
+@media(max-width:480px){
+  .driverStatusGrid{
+    gap:12px;
+  }
+
+  .driverStatusCurrent strong,
+  .driverStatusNext strong{
+    font-size:1.35rem;
+  }
+}
