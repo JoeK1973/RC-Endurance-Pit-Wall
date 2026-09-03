@@ -1083,30 +1083,27 @@ li button {
   margin:0;
 }
 .nextDriver{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  justify-content:flex-start;
   text-align:right;
+  gap:2px;
   min-width:120px;
+  padding-top:2px;
 }
-.nextDriver span{
-  display:block;
-  font-size:.68rem;
-  letter-spacing:.12em;
-  color:var(--muted);
-  font-weight:800;
-  margin-bottom:5px;
-}
+
+.nextDriver span,
 .nextDriver strong{
   display:block;
+  margin:0;
   color:var(--accent);
   font-size:1rem;
+  font-weight:800;
+  line-height:1.15;
+  letter-spacing:.04em;
 }
-@media(max-width:480px){
-  .currentDriverHeading{
-    gap:10px;
-  }
-  .nextDriver{
-    min-width:90px;
-  }
-  .nextDriver strong{
-    font-size:.9rem;
-  }
+
+.nextDriver strong{
+  letter-spacing:0;
 }
