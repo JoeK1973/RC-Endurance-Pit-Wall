@@ -1273,6 +1273,491 @@ useEffect(() => {
       });
     };
 
+    /*
+   * Clear lap and performance data only.
+   *
+   * Keeps:
+   * - Drivers
+   * - Driver names
+   * - Driver queue
+   * - Current driver
+   * - Activity tracker rotation
+   * - RC-Results connection
+   * - Race timer
+   *
+   * Clears:
+   * - RC-Results laps stored
+   * - Current stint laps
+   * - Driver lap statistics
+   * - Driver comparison data
+   * - Current stint pace
+   * - Stint history
+   * - Rotation / pit history
+   */
+  const clearLapData =
+    async () => {
+      const currentSession =
+        session;
+
+      const currentRace =
+        race;
+
+      const db =
+        supabase.current;
+
+      if (
+        !currentSession ||
+        !currentRace ||
+        !db
+      ) {
+        return;
+      }
+
+      const confirmed =
+        window.confirm(
+          "Clear all lap, stint, driver performance and rotation history data? Drivers, driver names, queue and activity tracker will be kept."
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setMessage(
+        "Clearing lap data..."
+      );
+
+      /*
+       * First remove the active stint reference
+       * so the stint records can safely be deleted.
+       *
+       * Keep the current driver and activity
+       * rotation unchanged.
+       */
+      const {
+        error: raceError,
+      } = await db
+        .from("races")
+        .update({
+          active_stint_id:
+            null,
+          current_stint_started_at:
+            null,
+        })
+        .eq(
+          "id",
+          currentRace.id
+        );
+
+      if (raceError) {
+        setMessage(
+          raceError.message
+        );
+        return;
+      }
+
+      /*
+       * Delete all stored lap data.
+       */
+      const {
+        error: lapsError,
+      } = await db
+        .from("race_laps")
+        .delete()
+        .eq(
+          "session_id",
+          currentSession.id
+        );
+
+      if (lapsError) {
+        setMessage(
+          lapsError.message
+        );
+        return;
+      }
+
+      /*
+       * Delete all stint history.
+       */
+      const {
+        error: stintsError,
+      } = await db
+        .from("driver_stints")
+        .delete()
+        .eq(
+          "session_id",
+          currentSession.id
+        );
+
+      if (stintsError) {
+        setMessage(
+          stintsError.message
+        );
+        return;
+      }
+
+      /*
+       * Delete all rotation and pit history.
+       */
+      const {
+        error: eventsError,
+      } = await db
+        .from("race_events")
+        .delete()
+        .eq(
+          "session_id",
+          currentSession.id
+        );
+
+      if (eventsError) {
+        setMessage(
+          eventsError.message
+        );
+        return;
+      }
+
+      /*
+       * Clear all local lap/history data.
+       */
+      setLiveLaps([]);
+      setRaceLaps([]);
+      setStints([]);
+      setRaceEvents([]);
+
+      previousResultRef.current =
+        null;
+
+      setHistoryDriverFilter(
+        "all"
+      );
+
+      setHistoryDateFilter(
+        ""
+      );
+
+      /*
+       * If there is currently a driver,
+       * immediately start a fresh empty stint
+       * so future laps continue to be associated
+       * with the current driver.
+       */
+      if (
+        currentRace.current_driver_id
+      ) {
+        const nowIso =
+          new Date().toISOString();
+
+        const {
+          data: newStint,
+          error: newStintError,
+        } = await db
+          .from("driver_stints")
+          .insert({
+            session_id:
+              currentSession.id,
+
+            driver_id:
+              currentRace.current_driver_id,
+
+            started_at:
+              nowIso,
+
+            start_lap:
+              0,
+          })
+          .select()
+          .single();
+
+        if (newStintError) {
+          setMessage(
+            newStintError.message
+          );
+          return;
+        }
+
+        const {
+          error: updateError,
+        } = await db
+          .from("races")
+          .update({
+            active_stint_id:
+              newStint.id,
+
+            current_stint_started_at:
+              nowIso,
+          })
+          .eq(
+            "id",
+            currentRace.id
+          );
+
+        if (updateError) {
+          setMessage(
+            updateError.message
+          );
+          return;
+        }
+
+        setRace({
+          ...currentRace,
+
+          active_stint_id:
+            newStint.id,
+
+          current_stint_started_at:
+            nowIso,
+        });
+      } else {
+        setRace({
+          ...currentRace,
+
+          active_stint_id:
+            null,
+
+          current_stint_started_at:
+            null,
+        });
+      }
+
+      setMessage(
+        "Lap and performance data cleared."
+      );
+    };
+
+
+  /*
+   * Clear absolutely all race/team data.
+   *
+   * Clears:
+   * - RC-Results laps stored
+   * - Current stint laps
+   * - Driver lap statistics
+   * - Driver comparison data
+   * - Current stint pace
+   * - Stint history
+   * - Rotation / pit history
+   * - Drivers
+   * - Driver names
+   * - Driver queue
+   * - Current driver
+   * - Activity tracker rotation
+   *
+   * Keeps:
+   * - The session itself
+   * - RC-Results connection
+   * - Race settings
+   */
+  const clearAllData =
+    async () => {
+      const currentSession =
+        session;
+
+      const currentRace =
+        race;
+
+      const db =
+        supabase.current;
+
+      if (
+        !currentSession ||
+        !currentRace ||
+        !db
+      ) {
+        return;
+      }
+
+      const confirmed =
+        window.confirm(
+          "CLEAR ALL DATA? This will permanently remove all laps, stints, rotation history, drivers, driver names and the driver queue for this session."
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setMessage(
+        "Clearing all data..."
+      );
+
+      /*
+       * Remove race references first.
+       */
+      const {
+        error: raceError,
+      } = await db
+        .from("races")
+        .update({
+          current_driver_id:
+            null,
+
+          current_stint_started_at:
+            null,
+
+          activity_rotation:
+            0,
+
+          active_stint_id:
+            null,
+        })
+        .eq(
+          "id",
+          currentRace.id
+        );
+
+      if (raceError) {
+        setMessage(
+          raceError.message
+        );
+        return;
+      }
+
+      /*
+       * Delete queue before drivers.
+       */
+      const {
+        error: queueError,
+      } = await db
+        .from("driver_queue")
+        .delete()
+        .eq(
+          "session_id",
+          currentSession.id
+        );
+
+      if (queueError) {
+        setMessage(
+          queueError.message
+        );
+        return;
+      }
+
+      /*
+       * Delete laps.
+       */
+      const {
+        error: lapsError,
+      } = await db
+        .from("race_laps")
+        .delete()
+        .eq(
+          "session_id",
+          currentSession.id
+        );
+
+      if (lapsError) {
+        setMessage(
+          lapsError.message
+        );
+        return;
+      }
+
+      /*
+       * Delete stint history.
+       */
+      const {
+        error: stintsError,
+      } = await db
+        .from("driver_stints")
+        .delete()
+        .eq(
+          "session_id",
+          currentSession.id
+        );
+
+      if (stintsError) {
+        setMessage(
+          stintsError.message
+        );
+        return;
+      }
+
+      /*
+       * Delete rotation history.
+       */
+      const {
+        error: eventsError,
+      } = await db
+        .from("race_events")
+        .delete()
+        .eq(
+          "session_id",
+          currentSession.id
+        );
+
+      if (eventsError) {
+        setMessage(
+          eventsError.message
+        );
+        return;
+      }
+
+      /*
+       * Finally delete the drivers themselves.
+       */
+      const {
+        error: driversError,
+      } = await db
+        .from("drivers")
+        .delete()
+        .eq(
+          "session_id",
+          currentSession.id
+        );
+
+      if (driversError) {
+        setMessage(
+          driversError.message
+        );
+        return;
+      }
+
+      /*
+       * Clear all local data.
+       */
+      setDrivers([]);
+      setQueue([]);
+
+      setLiveLaps([]);
+      setRaceLaps([]);
+
+      setStints([]);
+      setRaceEvents([]);
+
+      previousResultRef.current =
+        null;
+
+      setHistoryDriverFilter(
+        "all"
+      );
+
+      setHistoryDateFilter(
+        ""
+      );
+
+      setActivityNote(
+        ""
+      );
+
+      setRace({
+        ...currentRace,
+
+        current_driver_id:
+          null,
+
+        current_stint_started_at:
+          null,
+
+        activity_rotation:
+          0,
+
+        active_stint_id:
+          null,
+      });
+
+      setMessage(
+        "All race and team data cleared."
+      );
+    };
+
   /*
    * Close the current
    * driver stint.
@@ -3371,6 +3856,78 @@ const stintLaps = raceLaps.filter(
       <span className="trafficLight amber" />
       <span className="trafficLight green" />
     </div>
+
+        {/* CLEAR LAP DATA */}
+    <button
+      className="icon clearLapDataButton"
+      onClick={() => {
+        void clearLapData();
+      }}
+      aria-label="Clear lap data"
+      title="Clear lap data"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          d="M14.7 3.3a2.1 2.1 0 0 1 3 0l3 3a2.1 2.1 0 0 1 0 3l-6.2 6.2-6-6L14.7 3.3Z"
+        />
+        <path
+          d="m7.3 10.7 6 6-5.6 2.2c-1.2.5-2.6.2-3.5-.7l-.4-.4c-.9-.9-1.2-2.3-.7-3.5l2.2-3.7Z"
+        />
+        <path
+          d="M3 21h18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
+    </button>
+
+        {/* CLEAR ALL DATA */}
+    <button
+      className="icon clearAllDataButton"
+      onClick={() => {
+        void clearAllData();
+      }}
+      aria-label="Clear all data"
+      title="Clear all data"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          d="M4 7h16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+
+        <path
+          d="M9 4h6l1 3H8l1-3Z"
+        />
+
+        <path
+          d="M6 7l1 13h10l1-13"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+
+        <path
+          d="M10 11v5M14 11v5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
+    </button>
 
     {/* SETTINGS */}
     <button
