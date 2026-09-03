@@ -1218,3 +1218,39 @@ html[data-theme="dark"] .logoLight {
 html[data-theme="dark"] .logoDark {
   display: block;
 }
+
+.leaveIconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 42px;
+  height: 42px;
+
+  padding: 0;
+
+  border: 1px solid var(--line);
+  border-radius: 10px;
+
+  background: transparent;
+  color: var(--text);
+
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
+}
+
+.leaveIconButton:hover {
+  background: var(--soft);
+}
+
+.leaveIconButton:active {
+  transform: scale(0.95);
+}
+
+.leaveIconButton svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
