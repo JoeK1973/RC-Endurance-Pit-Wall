@@ -3226,20 +3226,7 @@ const stintLaps = raceLaps.filter(
               }
             </b>{" "}
 
-<button
-  className="leaveIconButton"
-  onClick={leaveSession}
-  aria-label="Leave session"
-  title="Leave session"
->
-  <svg
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path d="M10 4H19V20H10V17H17V7H10V4Z" />
-    <path d="M10 8L4 12L10 16V13H15V11H10V8Z" />
-  </svg>
-</button>
+
           </p>
         </div>
 
