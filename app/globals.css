@@ -1186,8 +1186,15 @@ li button {
 
 .siteLogo {
   display: block;
-  height: 50px;
+  height: 75px;
   width: auto;
-  max-width: 300px;
+  max-width: 500px;
+}
+
+.siteLogo img {
+  display: block;
+  height: 75px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
