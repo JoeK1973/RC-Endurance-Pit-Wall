@@ -2068,6 +2068,7 @@ if (!previous) {
 /*
  * Keep the live lap display updated.
  */
+          
 setLiveLaps(
   (previous) => {
     const combined = [
