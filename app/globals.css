@@ -1185,16 +1185,26 @@ li button {
 }
 
 .siteLogo {
-  display: block;
+  position: relative;
   height: 75px;
-  width: auto;
-  max-width: 500px;
+  width: 400px;
+  max-width: 100%;
 }
 
 .siteLogo img {
-  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
   height: 75px;
   width: auto;
   max-width: 100%;
   object-fit: contain;
+}
+
+.logoLight {
+  display: block;
+}
+
+.logoDark {
+  display: none;
 }
