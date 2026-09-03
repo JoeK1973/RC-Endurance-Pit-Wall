@@ -4013,15 +4013,145 @@ export default function Home() {
         </div>
         <div className="historyTableWrap">
           <table className="historyTable">
-            <thead><tr><th>Driver</th><th>Date</th><th>Time</th><th>Laps</th><th>Lap times</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Driver</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Laps</th>
+                <th>Best lap</th>
+                <th>Average lap</th>
+                <th>Lap times</th>
+              </tr>
+            </thead>
             <tbody>
-              {filteredStints.map((stintItem) => {
-                const driver = drivers.find((item) => item.id === stintItem.driver_id);
-                const stintLaps = raceLaps.filter((lap) => lap.stint_id === stintItem.id);
-                const duration = stintItem.ended_at ? Math.max(0, Math.floor((new Date(stintItem.ended_at).getTime() - new Date(stintItem.started_at).getTime()) / 1000)) : 0;
-                return <tr key={stintItem.id} title={`Laps: ${stintLaps.length} · Time driven: ${fmt(duration)}`}><td>{driver?.name ?? "Unknown"}</td><td>{new Date(stintItem.started_at).toLocaleDateString()}</td><td>{fmt(duration)}</td><td>{stintLaps.length}</td><td>{stintLaps.map((lap) => fmtLap(lap.lap_time_seconds)).join(", ") || "--"}</td></tr>;
-              })}
-              {filteredStints.length === 0 && <tr><td colSpan={5}>No completed stints match the selected filters.</td></tr>}
+            {filteredStints.map((stintItem) => {
+  const driver =
+    drivers.find(
+      (item) =>
+        item.id === stintItem.driver_id
+    );
+
+  const stintLaps =
+    raceLaps.filter(
+      (lap) =>
+        lap.stint_id === stintItem.id
+    );
+
+  const duration =
+    stintItem.ended_at
+      ? Math.max(
+          0,
+          Math.floor(
+            (
+              new Date(
+                stintItem.ended_at
+              ).getTime() -
+              new Date(
+                stintItem.started_at
+              ).getTime()
+            ) / 1000
+          )
+        )
+      : 0;
+
+  /*
+   * Get all valid lap times for this stint.
+   */
+  const lapTimes =
+    stintLaps
+      .map(
+        (lap) =>
+          Number(
+            lap.lap_time_seconds
+          )
+      )
+      .filter(
+        (lapTime) =>
+          Number.isFinite(lapTime) &&
+          lapTime > 0
+      );
+
+  /*
+   * Best lap uses all valid laps.
+   */
+  const bestLap =
+    lapTimes.length > 0
+      ? Math.min(...lapTimes)
+      : null;
+
+  /*
+   * Ignore laps over 30 seconds when
+   * calculating the average.
+   *
+   * These are assumed to be the laps
+   * containing a driver or battery change.
+   */
+  const averageLapTimes =
+    lapTimes.filter(
+      (lapTime) =>
+        lapTime <= 30
+    );
+
+  const averageLap =
+    averageLapTimes.length > 0
+      ? averageLapTimes.reduce(
+          (total, lapTime) =>
+            total + lapTime,
+          0
+        ) /
+        averageLapTimes.length
+      : null;
+
+  return (
+    <tr
+      key={stintItem.id}
+      title={
+        `Laps: ${stintLaps.length} · ` +
+        `Time driven: ${fmt(duration)} · ` +
+        `Best: ${fmtLap(bestLap)} · ` +
+        `Average: ${fmtLap(averageLap)}`
+      }
+    >
+      <td>
+        {driver?.name ?? "Unknown"}
+      </td>
+
+      <td>
+        {new Date(
+          stintItem.started_at
+        ).toLocaleDateString()}
+      </td>
+
+      <td>
+        {fmt(duration)}
+      </td>
+
+      <td>
+        {stintLaps.length}
+      </td>
+
+      <td>
+        {fmtLap(bestLap)}
+      </td>
+
+      <td>
+        {fmtLap(averageLap)}
+      </td>
+
+      <td>
+        {stintLaps
+          .map((lap) =>
+            fmtLap(
+              lap.lap_time_seconds
+            )
+          )
+          .join(", ") || "--"}
+      </td>
+    </tr>
+  );
+})}
+              {filteredStints.length === 0 && <tr><td colSpan={7}>No completed stints match the selected filters.</td></tr>}
             </tbody>
           </table>
         </div>
