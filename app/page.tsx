@@ -2337,6 +2337,39 @@ export default function Home() {
     ) ?? null;
 
   /*
+   * The resting driver is always the driver immediately after
+   * the current driver in the activity rotation:
+   * Drive → Rest → Pit → Marshal.
+   */
+  const nextDriver =
+    (() => {
+      if (
+        !race?.current_driver_id ||
+        drivers.length < 2
+      ) {
+        return null;
+      }
+
+      const currentIndex =
+        drivers.findIndex(
+          (driver) =>
+            driver.id ===
+            race.current_driver_id
+        );
+
+      if (currentIndex === -1) {
+        return null;
+      }
+
+      return (
+        drivers[
+          (currentIndex + 1) %
+            drivers.length
+        ] ?? null
+      );
+    })();
+
+  /*
    * Activity rotation.
    */
   const getActivityForDriver =
@@ -2983,10 +3016,20 @@ export default function Home() {
             CURRENT DRIVER
           </span>
 
-          <h2>
-            {currentDriver?.name ??
-              "Add a driver"}
-          </h2>
+          <div className="currentDriverHeading">
+            <h2>
+              {currentDriver?.name ??
+                "Add a driver"}
+            </h2>
+
+            <div className="nextDriver">
+              <span>NEXT DRIVER</span>
+              <strong>
+                {nextDriver?.name ??
+                  "—"}
+              </strong>
+            </div>
+          </div>
 
           <b>
             STINT {fmt(stint)}
