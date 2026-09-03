@@ -315,10 +315,25 @@ export default function Home() {
     useState(false);
 
   const [message, setMessage] =
-    useState("");
+  useState("");
 
-  const [showShare, setShowShare] =
-    useState(false);
+const [showShare, setShowShare] =
+  useState(false);
+
+useEffect(() => {
+  if (!message) {
+    return;
+  }
+
+  const timeout =
+    window.setTimeout(() => {
+      setMessage("");
+    }, 60000);
+
+  return () => {
+    window.clearTimeout(timeout);
+  };
+}, [message]);
   
   const [showSettings, setShowSettings] =
   useState(false);
@@ -3233,50 +3248,88 @@ const stintLaps = raceLaps.filter(
           </p>
         </div>
 
-<div className="headerActions">
-  <button
-    className="icon"
-    onClick={() => setShowSettings(true)}
-    aria-label="Race settings"
-    title="Race settings"
-  >
-    ⚙
-  </button>
-
-  <button
-    className="icon"
-    onClick={() => setShowShare(true)}
-    aria-label="Share session"
-    title="Share session"
-  >
-    ↗
-  </button>
-
-  <button
-    className="icon"
-    onClick={() => setDark((value) => !value)}
-    aria-label="Toggle theme"
-    title="Toggle theme"
-  >
-    {dark ? "☀" : "◐"}
-  </button>
-
-  {/* Leave session */}
-  <button
-    className="leaveIconButton"
-    onClick={leaveSession}
-    aria-label="Leave session"
-    title="Leave session"
-  >
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
+<div className="headerRight">
+  {message && (
+    <div
+      className="headerMessage"
+      role="status"
     >
-      <path d="M10 4H19V20H10V17H17V7H10V4Z" />
-      <path d="M10 8L4 12L10 16V13H15V11H10V8Z" />
-    </svg>
-  </button>
-  
+      {message}
+    </div>
+  )}
+
+  <div className="headerActions">
+
+    {/* SESSION TRAFFIC LIGHTS */}
+    <div
+      className={`trafficLights ${
+        activeRace.status
+      }`}
+      title={`Race ${
+        activeRace.status
+      }`}
+      aria-label={`Race status: ${
+        activeRace.status
+      }`}
+    >
+      <span className="trafficLight red" />
+      <span className="trafficLight amber" />
+      <span className="trafficLight green" />
+    </div>
+
+    {/* SETTINGS */}
+    <button
+      className="icon"
+      onClick={() =>
+        setShowSettings(true)
+      }
+      aria-label="Race settings"
+      title="Race settings"
+    >
+      ⚙
+    </button>
+
+    {/* SHARE */}
+    <button
+      className="icon"
+      onClick={() =>
+        setShowShare(true)
+      }
+      aria-label="Share session"
+      title="Share session"
+    >
+      ↗
+    </button>
+
+    {/* LIGHT / DARK */}
+    <button
+      className="icon"
+      onClick={() =>
+        setDark((value) => !value)
+      }
+      aria-label="Toggle theme"
+      title="Toggle theme"
+    >
+      {dark ? "☀" : "◐"}
+    </button>
+
+    {/* LEAVE */}
+    <button
+      className="leaveIconButton"
+      onClick={leaveSession}
+      aria-label="Leave session"
+      title="Leave session"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path d="M10 4H19V20H10V17H17V7H10V4Z" />
+        <path d="M10 8L4 12L10 16V13H15V11H10V8Z" />
+      </svg>
+    </button>
+
+  </div>
 </div>
       </header>
 
@@ -3610,10 +3663,16 @@ const stintLaps = raceLaps.filter(
                 </div>
               </div>
 
-              <p className="muted">
-                Tracking laps every
-                5 seconds.
-              </p>
+<div className="liveResultsFooter">
+  <p className="muted">
+    Tracking laps every 5 seconds.
+  </p>
+
+  <small className="lapsStored">
+    RC-RESULTS LAPS STORED:
+    <b>{raceLaps.length}</b>
+  </small>
+</div>
             </div>
           )}
         </article>
@@ -3968,13 +4027,7 @@ const stintLaps = raceLaps.filter(
             </b>
           </p>
 
-          <p>
-            RC-Results laps
-            stored:{" "}
-            <b>
-              {raceLaps.length}
-            </b>
-          </p>
+
 
           <button
             onClick={() =>
@@ -3986,11 +4039,7 @@ const stintLaps = raceLaps.filter(
             SHARE SESSION
           </button>
 
-          {message && (
-            <p className="message">
-              {message}
-            </p>
-          )}
+
         </article>
       </section>
 
