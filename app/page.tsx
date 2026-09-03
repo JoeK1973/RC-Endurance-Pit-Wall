@@ -2659,22 +2659,19 @@ export default function Home() {
       <main data-tab={activeTab}>
         <header>
           <div>
-<picture className="siteLogo">
-  <source
-    media="(prefers-color-scheme: dark)"
-    srcSet="/logo-dark-pw.png"
-  />
-
-  <source
-    media="(prefers-color-scheme: light)"
-    srcSet="/logo-light-pw.png"
-  />
-
+<div className="siteLogo">
   <img
     src="/logo-light-pw.png"
     alt="RC Endurance Pit Wall"
+    className="logoLight"
   />
-</picture>
+
+  <img
+    src="/logo-dark-pw.png"
+    alt="RC Endurance Pit Wall"
+    className="logoDark"
+  />
+</div>
 
             <p>
               Create or join a
@@ -3207,22 +3204,19 @@ const stintLaps = raceLaps.filter(
     <main data-tab={activeTab}>
       <header>
         <div>
-<picture className="siteLogo">
-  <source
-    media="(prefers-color-scheme: dark)"
-    srcSet="/logo-dark-pw.png"
-  />
-
-  <source
-    media="(prefers-color-scheme: light)"
-    srcSet="/logo-light-pw.png"
-  />
-
+<div className="siteLogo">
   <img
     src="/logo-light-pw.png"
     alt="RC Endurance Pit Wall"
+    className="logoLight"
   />
-</picture>
+
+  <img
+    src="/logo-dark-pw.png"
+    alt="RC Endurance Pit Wall"
+    className="logoDark"
+  />
+</div>
 
           <p>
             Session{" "}
