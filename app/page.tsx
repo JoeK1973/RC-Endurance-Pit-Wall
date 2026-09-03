@@ -3045,24 +3045,25 @@ export default function Home() {
         {/* CURRENT DRIVER */}
 
         <article className="card current">
-          <span>
-            CURRENT DRIVER
-          </span>
 
-          <div className="currentDriverHeading">
-            <h2>
-              {currentDriver?.name ??
-                "Add a driver"}
-            </h2>
 
-            <div className="nextDriver">
-              <span>NEXT DRIVER</span>
-              <strong>
-                {nextDriver?.name ??
-                  "—"}
-              </strong>
-            </div>
-          </div>
+<div className="driverStatusGrid">
+  <div className="driverStatusCurrent">
+    <span>CURRENT DRIVER</span>
+
+    <strong>
+      {currentDriver?.name ?? "Add a driver"}
+    </strong>
+  </div>
+
+  <div className="driverStatusNext">
+    <span>NEXT DRIVER</span>
+
+    <strong>
+      {nextDriver?.name ?? "—"}
+    </strong>
+  </div>
+</div>
 
           <b>
             STINT {fmt(stint)}
