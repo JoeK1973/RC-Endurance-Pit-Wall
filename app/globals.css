@@ -1183,3 +1183,11 @@ li button {
   display:grid;
   place-items:center;
 }
+
+.siteLogo {
+  display: block;
+  height: 50px;
+  width: auto;
+  max-width: 300px;
+  object-fit: contain;
+}
