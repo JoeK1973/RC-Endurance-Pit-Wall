@@ -3340,16 +3340,7 @@ const stintLaps = raceLaps.filter(
   />
 </div>
 
-          <p>
-            Session{" "}
-            <b>
-              {
-                activeSession.session_code
-              }
-            </b>{" "}
 
-
-          </p>
         </div>
 
 <div className="headerRight">
