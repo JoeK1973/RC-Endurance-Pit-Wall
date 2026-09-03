@@ -2007,12 +2007,28 @@ if (
     /*
      * First poll only establishes the baseline.
      */
-    if (!previous) {
-      previousResultRef.current = {
-        laps: currentLapNumber,
-        total: currentTotalTime,
-      };
-    } else {
+if (!previous) {
+  previousResultRef.current = {
+    laps: currentLapNumber,
+    total: currentTotalTime,
+  };
+
+  /*
+   * If RC-Results is already on lap 1 when
+   * the first poll happens, save that lap.
+   */
+  if (
+    currentLapNumber === 1 &&
+    currentTotalTime > 0
+  ) {
+    incomingLaps = [
+      {
+        lapNumber: 1,
+        lapTime: currentTotalTime,
+      },
+    ];
+  }
+} else {
       const lapDifference =
         currentLapNumber -
         previous.laps;
