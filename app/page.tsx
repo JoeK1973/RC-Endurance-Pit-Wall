@@ -3798,6 +3798,129 @@ export default function Home() {
         </div>
       </section>
 
+
+      {/* DRIVER QUEUE */}
+      <section className="card historySection teamOnly">
+        <div className="titleRow">
+          <span>DRIVER QUEUE</span>
+          <small>{queue.length} queued</small>
+        </div>
+
+        {queue.length === 0 ? (
+          <p className="muted">
+            Add drivers below. Drivers can appear multiple times.
+          </p>
+        ) : (
+          <ol>
+            {queue.map((queueItem, index) => {
+              const driver = drivers.find(
+                (item) => item.id === queueItem.driver_id
+              );
+
+              return (
+                <li key={queueItem.id}>
+                  <b>{index + 1}</b>
+                  <span>{driver?.name ?? "Unknown driver"}</span>
+                  <button
+                    onClick={() => {
+                      void removeQueue(queueItem.id);
+                    }}
+                    aria-label="Remove from queue"
+                  >
+                    ×
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+
+        <div className="add">
+          {drivers.map((driver) => (
+            <button
+              key={driver.id}
+              onClick={() => {
+                void addQueue(driver.id);
+              }}
+            >
+              + {driver.name}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* DRIVERS */}
+      <section className="card historySection teamOnly">
+        <div className="titleRow">
+          <span>DRIVERS</span>
+          <small>{drivers.length} drivers</small>
+        </div>
+
+        <div className="addDriver">
+          <input
+            value={newDriver}
+            onChange={(event) => setNewDriver(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void addDriver();
+              }
+            }}
+            placeholder="Driver name"
+          />
+
+          <button
+            disabled={!newDriver.trim()}
+            onClick={() => {
+              void addDriver();
+            }}
+          >
+            ADD
+          </button>
+        </div>
+
+        {drivers.length === 0 ? (
+          <p className="muted">No drivers added yet.</p>
+        ) : (
+          drivers.map((driver) => {
+            const stats = getDriverStats(driver.id);
+
+            return (
+              <div className="driver" key={driver.id}>
+                <div className="driverInfo">
+                  <button
+                    className={
+                      currentDriver?.id === driver.id
+                        ? "selected"
+                        : ""
+                    }
+                    onClick={() => {
+                      void setCurrentDriver(driver.id);
+                    }}
+                  >
+                    {driver.name}
+                  </button>
+
+                  <small>
+                    {stats.laps} laps · Best {fmtLap(stats.best)} · Avg{" "}
+                    {fmtLap(stats.average)}
+                  </small>
+                </div>
+
+                <button
+                  onClick={() => {
+                    void editDriver(driver);
+                  }}
+                  aria-label={`Edit ${driver.name}`}
+                >
+                  ✎
+                </button>
+              </div>
+            );
+          })
+        )}
+      </section>
+
       {/* STINT HISTORY */}
       <section className="card historySection analysisOnly">
         <div className="titleRow">
