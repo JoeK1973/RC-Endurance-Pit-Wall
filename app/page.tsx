@@ -2069,9 +2069,36 @@ if (!previous) {
  * Keep the live lap display updated.
  */
 setLiveLaps(
-  incomingLaps
-);
+  (previous) => {
+    const combined = [
+      ...previous,
+      ...incomingLaps,
+    ];
 
+    const uniqueLaps =
+      new Map<
+        number,
+        LiveLap
+      >();
+
+    combined.forEach(
+      (lap) => {
+        uniqueLaps.set(
+          lap.lapNumber,
+          lap
+        );
+      }
+    );
+
+    return Array.from(
+      uniqueLaps.values()
+    ).sort(
+      (a, b) =>
+        a.lapNumber -
+        b.lapNumber
+    );
+  }
+);
 /*
  * No new lap detected yet.
  */
