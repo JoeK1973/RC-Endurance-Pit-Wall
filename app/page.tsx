@@ -41,14 +41,32 @@ type RaceStatus =
 type Race = {
   id: string;
   session_id: string;
+
   duration_seconds: number;
+
+  stint_target_minutes: number;
+  stint_alert_minutes: number;
+
+  audio_alerts: boolean;
+  auto_start_from_live: boolean;
+
+  show_battery_change: boolean;
+  show_driver_change: boolean;
+  show_full_change: boolean;
+
   status: RaceStatus;
+
   started_at: string | null;
   paused_at: string | null;
+
   accumulated_pause_seconds: number;
+
   current_driver_id: string | null;
+
   current_stint_started_at: string | null;
+
   activity_rotation: number;
+
   active_stint_id: string | null;
 };
 
@@ -522,18 +540,52 @@ useEffect(() => {
           sessionData.session_code,
       };
 
-      const loadedRace: Race = {
-        id: raceData.id,
-        session_id:
-          raceData.session_id,
+const loadedRace: Race = {
+  id: raceData.id,
 
-        duration_seconds: Number(
-          raceData.duration_seconds ??
-            0
-        ),
+  session_id:
+    raceData.session_id,
 
-        status:
-          raceData.status as RaceStatus,
+  duration_seconds:
+    Number(
+      raceData.duration_seconds ??
+        0
+    ),
+
+  stint_target_minutes:
+    Number(
+      raceData.stint_target_minutes ??
+        20
+    ),
+
+  stint_alert_minutes:
+    Number(
+      raceData.stint_alert_minutes ??
+        3
+    ),
+
+  audio_alerts:
+    raceData.audio_alerts ??
+    true,
+
+  auto_start_from_live:
+    raceData.auto_start_from_live ??
+    false,
+
+  show_battery_change:
+    raceData.show_battery_change ??
+    true,
+
+  show_driver_change:
+    raceData.show_driver_change ??
+    true,
+
+  show_full_change:
+    raceData.show_full_change ??
+    true,
+
+  status:
+    raceData.status as RaceStatus,
 
         started_at:
           raceData.started_at ??
@@ -575,6 +627,43 @@ useEffect(() => {
       setRace(
         loadedRace
       );
+
+      setStintTargetMinutes(
+  loadedRace.stint_target_minutes
+);
+
+setStintAlertMinutes(
+  loadedRace.stint_alert_minutes
+);
+
+setAudioAlerts(
+  loadedRace.audio_alerts
+);
+
+setAutoStartFromLive(
+  loadedRace.auto_start_from_live
+);
+
+setShowBatteryChange(
+  loadedRace.show_battery_change
+);
+
+setShowDriverChange(
+  loadedRace.show_driver_change
+);
+
+setShowFullChange(
+  loadedRace.show_full_change
+);
+
+setStrategyRaceMinutes(
+  Math.max(
+    1,
+    Math.round(
+      loadedRace.duration_seconds / 60
+    )
+  )
+);
 
       setDrivers(
         driverResult.data ?? []
@@ -4756,16 +4845,24 @@ const stintLaps = raceLaps.filter(
             type="number"
             min="1"
             value={stintTargetMinutes}
-            onChange={(event) =>
-              setStintTargetMinutes(
-                Math.max(
-                  1,
-                  Number(
-                    event.target.value
-                  ) || 1
-                )
-              )
-            }
+onChange={(event) => {
+  const value =
+    Math.max(
+      1,
+      Number(
+        event.target.value
+      ) || 1
+    );
+
+  setStintTargetMinutes(
+    value
+  );
+
+  void updateRace({
+    stint_target_minutes:
+      value,
+  });
+}}
           />
         </label>
 
@@ -4775,16 +4872,24 @@ const stintLaps = raceLaps.filter(
             type="number"
             min="0"
             value={stintAlertMinutes}
-            onChange={(event) =>
-              setStintAlertMinutes(
-                Math.max(
-                  0,
-                  Number(
-                    event.target.value
-                  ) || 0
-                )
-              )
-            }
+onChange={(event) => {
+  const value =
+    Math.max(
+      0,
+      Number(
+        event.target.value
+      ) || 0
+    );
+
+  setStintAlertMinutes(
+    value
+  );
+
+  void updateRace({
+    stint_alert_minutes:
+      value,
+  });
+}}
           />
         </label>
 
@@ -4792,11 +4897,19 @@ const stintLaps = raceLaps.filter(
           <input
             type="checkbox"
             checked={audioAlerts}
-            onChange={(event) =>
-              setAudioAlerts(
-                event.target.checked
-              )
-            }
+onChange={(event) => {
+  const value =
+    event.target.checked;
+
+  setAudioAlerts(
+    value
+  );
+
+  void updateRace({
+    audio_alerts:
+      value,
+  });
+}}
           />
           Audio stint alert
         </label>
@@ -4805,11 +4918,19 @@ const stintLaps = raceLaps.filter(
           <input
             type="checkbox"
             checked={autoStartFromLive}
-            onChange={(event) =>
-              setAutoStartFromLive(
-                event.target.checked
-              )
-            }
+onChange={(event) => {
+  const value =
+    event.target.checked;
+
+  setAutoStartFromLive(
+    value
+  );
+
+  void updateRace({
+    auto_start_from_live:
+      value,
+  });
+}}
           />
           Start race when live laps arrive
         </label>
@@ -4818,11 +4939,19 @@ const stintLaps = raceLaps.filter(
           <input
             type="checkbox"
             checked={showBatteryChange}
-            onChange={(event) =>
-              setShowBatteryChange(
-                event.target.checked
-              )
-            }
+onChange={(event) => {
+  const value =
+    event.target.checked;
+
+  setShowBatteryChange(
+    value
+  );
+
+  void updateRace({
+    show_battery_change:
+      value,
+  });
+}}
           />
           Show battery change
         </label>
@@ -4831,11 +4960,19 @@ const stintLaps = raceLaps.filter(
           <input
             type="checkbox"
             checked={showDriverChange}
-            onChange={(event) =>
-              setShowDriverChange(
-                event.target.checked
-              )
-            }
+onChange={(event) => {
+  const value =
+    event.target.checked;
+
+  setShowDriverChange(
+    value
+  );
+
+  void updateRace({
+    show_driver_change:
+      value,
+  });
+}}
           />
           Show driver change
         </label>
@@ -4844,11 +4981,19 @@ const stintLaps = raceLaps.filter(
           <input
             type="checkbox"
             checked={showFullChange}
-            onChange={(event) =>
-              setShowFullChange(
-                event.target.checked
-              )
-            }
+onChange={(event) => {
+  const value =
+    event.target.checked;
+
+  setShowFullChange(
+    value
+  );
+
+  void updateRace({
+    show_full_change:
+      value,
+  });
+}}
           />
           Show full change
         </label>
