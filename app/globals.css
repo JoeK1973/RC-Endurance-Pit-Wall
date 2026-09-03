@@ -1467,3 +1467,38 @@ html[data-theme="dark"] .logoDark {
     align-self: flex-end;
   }
 }
+
+.clearLapDataButton,
+.clearAllDataButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clearLapDataButton svg,
+.clearAllDataButton svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.clearLapDataButton {
+  color: #64748b;
+}
+
+.clearAllDataButton {
+  color: #dc2626;
+}
+
+html[data-theme="dark"] .clearLapDataButton {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] .clearAllDataButton {
+  color: #f87171;
+}
+
+.clearLapDataButton:hover,
+.clearAllDataButton:hover {
+  transform: translateY(-1px);
+}
