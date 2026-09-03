@@ -4273,10 +4273,29 @@ const stintLaps = raceLaps.filter(
 
       {/* STINT HISTORY */}
       <section className="card historySection analysisOnly">
-        <div className="titleRow">
-          <span>STINT HISTORY</span>
-          <small>{filteredStints.length} completed</small>
-        </div>
+<div className="titleRow">
+  <span>STINT HISTORY</span>
+
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+    }}
+  >
+    <button
+      className="exportButton"
+      onClick={exportStintHistory}
+      disabled={filteredStints.length === 0}
+    >
+      EXPORT EXCEL
+    </button>
+
+    <small>
+      {filteredStints.length} completed
+    </small>
+  </div>
+</div>
         <div className="historyFilters">
           <select value={historyDriverFilter} onChange={(event) => setHistoryDriverFilter(event.target.value)}>
             <option value="all">All drivers</option>
