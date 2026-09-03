@@ -2908,6 +2908,307 @@ export default function Home() {
     );
   };
 
+  const exportStintHistory = () => {
+  if (filteredStints.length === 0) {
+    setMessage("There are no stints to export.");
+    return;
+  }
+
+  const stintRows = filteredStints.map((stintItem) => {
+    const driver = drivers.find(
+      (item) => item.id === stintItem.driver_id
+    );
+
+    const stintLaps = raceLaps
+      .filter((lap) => lap.stint_id === stintItem.id)
+      .sort((a, b) => {
+        const aTime = a.created_at
+          ? new Date(a.created_at).getTime()
+          : 0;
+
+        const bTime = b.created_at
+          ? new Date(b.created_at).getTime()
+          : 0;
+
+        return aTime - bTime;
+      });
+
+    const lapTimes = stintLaps
+      .map((lap) => Number(lap.lap_time_seconds))
+      .filter(
+        (lapTime) =>
+          Number.isFinite(lapTime) &&
+          lapTime > 0
+      );
+
+    const bestLap =
+      lapTimes.length > 0
+        ? Math.min(...lapTimes)
+        : null;
+
+    // Ignore laps over 30 seconds for average pace.
+    const averageLaps = lapTimes.filter(
+      (lapTime) => lapTime <= 30
+    );
+
+    const averageLap =
+      averageLaps.length > 0
+        ? averageLaps.reduce(
+            (total, lapTime) => total + lapTime,
+            0
+          ) / averageLaps.length
+        : null;
+
+    const duration = stintItem.ended_at
+      ? Math.max(
+          0,
+          Math.floor(
+            (new Date(stintItem.ended_at).getTime() -
+              new Date(stintItem.started_at).getTime()) /
+              1000
+          )
+        )
+      : 0;
+
+    return {
+      Driver: driver?.name ?? "Unknown",
+
+      Date: new Date(
+        stintItem.started_at
+      ).toLocaleDateString(),
+
+      "Stint started": new Date(
+        stintItem.started_at
+      ).toLocaleString(),
+
+      "Stint ended": stintItem.ended_at
+        ? new Date(
+            stintItem.ended_at
+          ).toLocaleString()
+        : "",
+
+      "Total stint time": fmt(duration),
+
+      "Lap count": lapTimes.length,
+
+      "Best lap":
+        bestLap !== null
+          ? fmtLap(bestLap)
+          : "",
+
+      "Average lap (excluding >30s)":
+        averageLap !== null
+          ? fmtLap(averageLap)
+          : "",
+
+      "All lap times": lapTimes
+        .map((lapTime) => fmtLap(lapTime))
+        .join(", "),
+    };
+  });
+
+  const lapRows = filteredStints.flatMap(
+    (stintItem) => {
+      const driver = drivers.find(
+        (item) => item.id === stintItem.driver_id
+      );
+
+      const stintLaps = raceLaps
+        .filter(
+          (lap) => lap.stint_id === stintItem.id
+        )
+        .sort((a, b) => {
+          const aTime = a.created_at
+            ? new Date(a.created_at).getTime()
+            : 0;
+
+          const bTime = b.created_at
+            ? new Date(b.created_at).getTime()
+            : 0;
+
+          return aTime - bTime;
+        });
+
+      return stintLaps.map((lap, index) => {
+        const lapTime = Number(
+          lap.lap_time_seconds
+        );
+
+        return {
+          Driver:
+            driver?.name ?? "Unknown",
+
+          "Stint started":
+            new Date(
+              stintItem.started_at
+            ).toLocaleString(),
+
+          "Lap number":
+            index + 1,
+
+          "Lap time":
+            fmtLap(lapTime),
+
+          "Lap time seconds":
+            lapTime,
+
+          "Included in average":
+            lapTime <= 30
+              ? "YES"
+              : "NO",
+        };
+      });
+    }
+  );
+
+  const driverIds = [
+    ...new Set(
+      filteredStints.map(
+        (stintItem) =>
+          stintItem.driver_id
+      )
+    ),
+  ];
+
+  const driverRows = driverIds.map(
+    (driverId) => {
+      const driver = drivers.find(
+        (item) => item.id === driverId
+      );
+
+      const driverStints = filteredStints.filter(
+        (stintItem) =>
+          stintItem.driver_id === driverId
+      );
+
+      const allDriverLaps = driverStints.flatMap(
+        (stintItem) =>
+          raceLaps.filter(
+            (lap) =>
+              lap.stint_id === stintItem.id
+          )
+      );
+
+      const lapTimes = allDriverLaps
+        .map(
+          (lap) =>
+            Number(lap.lap_time_seconds)
+        )
+        .filter(
+          (lapTime) =>
+            Number.isFinite(lapTime) &&
+            lapTime > 0
+        );
+
+      const validLaps = lapTimes.filter(
+        (lapTime) => lapTime <= 30
+      );
+
+      const totalSeconds = driverStints.reduce(
+        (total, stintItem) => {
+          if (!stintItem.ended_at) {
+            return total;
+          }
+
+          return (
+            total +
+            Math.max(
+              0,
+              Math.floor(
+                (new Date(
+                  stintItem.ended_at
+                ).getTime() -
+                  new Date(
+                    stintItem.started_at
+                  ).getTime()) / 1000
+              )
+            )
+          );
+        },
+        0
+      );
+
+      return {
+        Driver:
+          driver?.name ?? "Unknown",
+
+        "Completed stints":
+          driverStints.length,
+
+        "Total driving time":
+          fmt(totalSeconds),
+
+        "Total laps":
+          lapTimes.length,
+
+        "Best lap":
+          lapTimes.length > 0
+            ? fmtLap(
+                Math.min(...lapTimes)
+              )
+            : "",
+
+        "Average lap (excluding >30s)":
+          validLaps.length > 0
+            ? fmtLap(
+                validLaps.reduce(
+                  (total, lapTime) =>
+                    total + lapTime,
+                  0
+                ) / validLaps.length
+              )
+            : "",
+      };
+    }
+  );
+
+  const workbook =
+    XLSX.utils.book_new();
+
+  const stintWorksheet =
+    XLSX.utils.json_to_sheet(stintRows);
+
+  const lapWorksheet =
+    XLSX.utils.json_to_sheet(lapRows);
+
+  const driverWorksheet =
+    XLSX.utils.json_to_sheet(driverRows);
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    stintWorksheet,
+    "Stint History"
+  );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    lapWorksheet,
+    "All Laps"
+  );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    driverWorksheet,
+    "Driver Summary"
+  );
+
+  XLSX.writeFile(
+    workbook,
+    `stint-history-${
+      activeSession.session_code
+    }-${new Date()
+      .toISOString()
+      .slice(0, 10)}.xlsx`
+  );
+
+  setMessage(
+    `Exported ${filteredStints.length} stint${
+      filteredStints.length === 1
+        ? ""
+        : "s"
+    }.`
+  );
+};
   const shareLink =
     getShareLink();
 
