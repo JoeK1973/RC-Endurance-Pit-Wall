@@ -4004,43 +4004,7 @@ const stintLaps = raceLaps.filter(
           )}
         </article>
 
-        {/* SESSION STATUS */}
 
-        <article className="card history raceOnly">
-          <span>
-            SESSION STATUS
-          </span>
-
-          <p>
-            Status:{" "}
-            <b>
-              {activeRace.status.toUpperCase()}
-            </b>
-          </p>
-
-          <p>
-            Session code:{" "}
-            <b>
-              {
-                activeSession.session_code
-              }
-            </b>
-          </p>
-
-
-
-          <button
-            onClick={() =>
-              setShowShare(
-                true
-              )
-            }
-          >
-            SHARE SESSION
-          </button>
-
-
-        </article>
       </section>
 
 
