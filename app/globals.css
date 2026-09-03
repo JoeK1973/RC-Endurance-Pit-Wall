@@ -1141,7 +1141,7 @@ li button {
 }
 
 .driverStatusNext span{
-  color:var(--accent);
+  color:var(--muted);
 }
 
 .driverStatusCurrent strong,
@@ -1156,7 +1156,7 @@ li button {
 }
 
 .driverStatusNext strong{
-  color:var(--accent);
+  color:var(--text);
 }
 
 @media(max-width:480px){
