@@ -1186,8 +1186,8 @@ li button {
 
 .siteLogo {
   position: relative;
-  height: 75px;
-  width: 400px;
+  height: 90px;
+  width: 500px;
   max-width: 100%;
 }
 
@@ -1195,16 +1195,26 @@ li button {
   position: absolute;
   top: 0;
   left: 0;
-  height: 75px;
+  height: 90px;
   width: auto;
   max-width: 100%;
   object-fit: contain;
 }
 
+/* Light mode */
 .logoLight {
   display: block;
 }
 
 .logoDark {
   display: none;
+}
+
+/* Dark mode */
+html[data-theme="dark"] .logoLight {
+  display: none;
+}
+
+html[data-theme="dark"] .logoDark {
+  display: block;
 }
