@@ -4974,9 +4974,262 @@ const stintLaps = raceLaps.filter(
           {recentDriverSeries.map(({driver,laps}) => laps.length > 1 && (
             <div className="driverChart" key={driver.id}>
               <strong>{driver.name}</strong>
-              <svg viewBox="0 0 600 180" role="img" aria-label={`${driver.name} recent lap times`}>
-                {(() => { const values=laps.map(l=>Number(l.lap_time_seconds)); const min=Math.min(...values); const max=Math.max(...values); const range=Math.max(.001,max-min); const pts=values.map((v,i)=>`${20+i/(values.length-1)*560},${15+(max-v)/range*140}`).join(" "); return <polyline fill="none" stroke="currentColor" strokeWidth="3" points={pts}/>; })()}
-              </svg>
+<svg
+  viewBox="0 0 600 240"
+  role="img"
+  aria-label={`${driver.name} recent lap times`}
+>
+  {(() => {
+    const values = laps.map(
+      (lap) =>
+        Number(
+          lap.lap_time_seconds
+        )
+    );
+
+    const min =
+      Math.min(
+        ...values
+      );
+
+    const max =
+      Math.max(
+        ...values
+      );
+
+    const padding =
+      Math.max(
+        0.1,
+        (max - min) * 0.1
+      );
+
+    const chartMin =
+      min - padding;
+
+    const chartMax =
+      max + padding;
+
+    const range =
+      Math.max(
+        0.001,
+        chartMax - chartMin
+      );
+
+    const left = 55;
+    const right = 575;
+    const top = 20;
+    const bottom = 190;
+
+    const points =
+      values.map(
+        (value, index) => ({
+          x:
+            values.length === 1
+              ? (left + right) / 2
+              : left +
+                (
+                  index /
+                  (
+                    values.length - 1
+                  )
+                ) *
+                  (
+                    right - left
+                  ),
+
+          y:
+            top +
+            (
+              (chartMax - value) /
+              range
+            ) *
+              (
+                bottom - top
+              ),
+        })
+      );
+
+    const smoothPath =
+      points.reduce(
+        (path, point, index) => {
+          if (index === 0) {
+            return `M ${point.x} ${point.y}`;
+          }
+
+          const previous =
+            points[index - 1];
+
+          const midpointX =
+            (
+              previous.x +
+              point.x
+            ) / 2;
+
+          return `${path}
+            Q ${midpointX} ${previous.y}
+            ${point.x} ${point.y}`;
+        },
+        ""
+      );
+
+    const yTicks =
+      Array.from(
+        { length: 5 },
+        (_, index) =>
+          chartMin +
+          (
+            index / 4
+          ) *
+            range
+      );
+
+    const xTickIndexes =
+      Array.from(
+        new Set(
+          [
+            0,
+            Math.floor(
+              (values.length - 1) / 2
+            ),
+            values.length - 1,
+          ]
+        )
+      );
+
+    return (
+      <>
+        {/* Y axis */}
+        <line
+          x1={left}
+          y1={top}
+          x2={left}
+          y2={bottom}
+          stroke="currentColor"
+          opacity="0.35"
+        />
+
+        {/* X axis */}
+        <line
+          x1={left}
+          y1={bottom}
+          x2={right}
+          y2={bottom}
+          stroke="currentColor"
+          opacity="0.35"
+        />
+
+        {/* Y axis grid and labels */}
+        {yTicks.map(
+          (tick, index) => {
+            const y =
+              top +
+              (
+                (chartMax - tick) /
+                range
+              ) *
+                (
+                  bottom - top
+                );
+
+            return (
+              <g
+                key={index}
+              >
+                <line
+                  x1={left}
+                  y1={y}
+                  x2={right}
+                  y2={y}
+                  stroke="currentColor"
+                  opacity="0.08"
+                />
+
+                <text
+                  x={left - 8}
+                  y={y + 4}
+                  textAnchor="end"
+                  fontSize="11"
+                  fill="currentColor"
+                  opacity="0.7"
+                >
+                  {tick.toFixed(3)}
+                </text>
+              </g>
+            );
+          }
+        )}
+
+        {/* X axis labels */}
+        {xTickIndexes.map(
+          (index) => (
+            <text
+              key={index}
+              x={points[index].x}
+              y={bottom + 20}
+              textAnchor="middle"
+              fontSize="11"
+              fill="currentColor"
+              opacity="0.7"
+            >
+              {index + 1}
+            </text>
+          )
+        )}
+
+        {/* Axis titles */}
+        <text
+          x={(left + right) / 2}
+          y="225"
+          textAnchor="middle"
+          fontSize="12"
+          fill="currentColor"
+          opacity="0.7"
+        >
+          Lap number
+        </text>
+
+        <text
+          x="15"
+          y={(top + bottom) / 2}
+          textAnchor="middle"
+          fontSize="12"
+          fill="currentColor"
+          opacity="0.7"
+          transform={`rotate(-90 15 ${(top + bottom) / 2})`}
+        >
+          Lap time (s)
+        </text>
+
+        {/* Smooth pace curve */}
+        <path
+          d={smoothPath}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Hoverable lap points */}
+        {points.map(
+          (point, index) => (
+            <circle
+              key={index}
+              cx={point.x}
+              cy={point.y}
+              r="4"
+              fill="currentColor"
+            >
+              <title>
+                {`Lap ${index + 1}: ${values[index].toFixed(3)}s`}
+              </title>
+            </circle>
+          )
+        )}
+      </>
+    );
+  })()}
+</svg>
               <small>{laps.length} laps · Best {fmtLap(Math.min(...laps.map(l=>Number(l.lap_time_seconds))))}</small>
             </div>
           ))}
@@ -5017,20 +5270,264 @@ const stintLaps = raceLaps.filter(
         {currentStintLaps.length < 2 ? (
           <p className="muted">Complete at least two laps to see the pace chart.</p>
         ) : (
-          <svg className="paceChart" viewBox="0 0 600 220" role="img" aria-label="Current stint lap time chart">
-            {(() => {
-              const values = currentStintLaps.map((lap) => lap.lap_time_seconds);
-              const min = Math.min(...values);
-              const max = Math.max(...values);
-              const range = Math.max(0.001, max - min);
-              const points = values.map((value, index) => {
-                const x = values.length === 1 ? 300 : 20 + (index / (values.length - 1)) * 560;
-                const y = 20 + ((max - value) / range) * 170;
-                return `${x},${y}`;
-              }).join(" ");
-              return <polyline fill="none" stroke="var(--accent)" strokeWidth="3" points={points} />;
-            })()}
-          </svg>
+<svg
+  className="paceChart"
+  viewBox="0 0 600 240"
+  role="img"
+  aria-label="Current stint lap time chart"
+>
+  {(() => {
+    const values =
+      currentStintLaps.map(
+        (lap) =>
+          Number(
+            lap.lap_time_seconds
+          )
+      );
+
+    const min =
+      Math.min(
+        ...values
+      );
+
+    const max =
+      Math.max(
+        ...values
+      );
+
+    const padding =
+      Math.max(
+        0.1,
+        (max - min) * 0.1
+      );
+
+    const chartMin =
+      min - padding;
+
+    const chartMax =
+      max + padding;
+
+    const range =
+      Math.max(
+        0.001,
+        chartMax - chartMin
+      );
+
+    const left = 55;
+    const right = 575;
+    const top = 20;
+    const bottom = 190;
+
+    const points =
+      values.map(
+        (value, index) => ({
+          x:
+            values.length === 1
+              ? (left + right) / 2
+              : left +
+                (
+                  index /
+                  (
+                    values.length - 1
+                  )
+                ) *
+                  (
+                    right - left
+                  ),
+
+          y:
+            top +
+            (
+              (chartMax - value) /
+              range
+            ) *
+              (
+                bottom - top
+              ),
+        })
+      );
+
+    const smoothPath =
+      points.reduce(
+        (path, point, index) => {
+          if (index === 0) {
+            return `M ${point.x} ${point.y}`;
+          }
+
+          const previous =
+            points[index - 1];
+
+          const midpointX =
+            (
+              previous.x +
+              point.x
+            ) / 2;
+
+          return `${path}
+            Q ${midpointX} ${previous.y}
+            ${point.x} ${point.y}`;
+        },
+        ""
+      );
+
+    const yTicks =
+      Array.from(
+        { length: 5 },
+        (_, index) =>
+          chartMin +
+          (
+            index / 4
+          ) *
+            range
+      );
+
+    const xTickIndexes =
+      Array.from(
+        new Set(
+          [
+            0,
+            Math.floor(
+              (values.length - 1) / 2
+            ),
+            values.length - 1,
+          ]
+        )
+      );
+
+    return (
+      <>
+        {/* Y axis */}
+        <line
+          x1={left}
+          y1={top}
+          x2={left}
+          y2={bottom}
+          stroke="currentColor"
+          opacity="0.35"
+        />
+
+        {/* X axis */}
+        <line
+          x1={left}
+          y1={bottom}
+          x2={right}
+          y2={bottom}
+          stroke="currentColor"
+          opacity="0.35"
+        />
+
+        {/* Y axis grid and labels */}
+        {yTicks.map(
+          (tick, index) => {
+            const y =
+              top +
+              (
+                (chartMax - tick) /
+                range
+              ) *
+                (
+                  bottom - top
+                );
+
+            return (
+              <g
+                key={index}
+              >
+                <line
+                  x1={left}
+                  y1={y}
+                  x2={right}
+                  y2={y}
+                  stroke="currentColor"
+                  opacity="0.08"
+                />
+
+                <text
+                  x={left - 8}
+                  y={y + 4}
+                  textAnchor="end"
+                  fontSize="11"
+                  fill="currentColor"
+                  opacity="0.7"
+                >
+                  {tick.toFixed(3)}
+                </text>
+              </g>
+            );
+          }
+        )}
+
+        {/* X axis labels */}
+        {xTickIndexes.map(
+          (index) => (
+            <text
+              key={index}
+              x={points[index].x}
+              y={bottom + 20}
+              textAnchor="middle"
+              fontSize="11"
+              fill="currentColor"
+              opacity="0.7"
+            >
+              {index + 1}
+            </text>
+          )
+        )}
+
+        {/* Axis titles */}
+        <text
+          x={(left + right) / 2}
+          y="225"
+          textAnchor="middle"
+          fontSize="12"
+          fill="currentColor"
+          opacity="0.7"
+        >
+          Lap number
+        </text>
+
+        <text
+          x="15"
+          y={(top + bottom) / 2}
+          textAnchor="middle"
+          fontSize="12"
+          fill="currentColor"
+          opacity="0.7"
+          transform={`rotate(-90 15 ${(top + bottom) / 2})`}
+        >
+          Lap time (s)
+        </text>
+
+        {/* Smooth curve */}
+        <path
+          d={smoothPath}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Hoverable data points */}
+        {points.map(
+          (point, index) => (
+            <circle
+              key={index}
+              cx={point.x}
+              cy={point.y}
+              r="4"
+              fill="var(--accent)"
+            >
+              <title>
+                {`Lap ${index + 1}: ${values[index].toFixed(3)}s`}
+              </title>
+            </circle>
+          )
+        )}
+      </>
+    );
+  })()}
+</svg>
         )}
       </section>
 
