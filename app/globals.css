@@ -2414,3 +2414,424 @@ main {
   }
 }
 
+/* =========================================================
+   PHASE 2 — RACE DASHBOARD
+   ========================================================= */
+
+
+/* ---------------------------------------------------------
+   RACE TAB — GENERAL
+   --------------------------------------------------------- */
+
+.racePanel {
+  width: 100%;
+}
+
+
+/* The Race tab is a vertical dashboard. */
+
+.racePanel > .grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+
+/* ---------------------------------------------------------
+   RACE TIMER
+   --------------------------------------------------------- */
+
+.racePanel .hero {
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  padding: 24px;
+
+  text-align: center;
+}
+
+
+.racePanel .hero > div:not(.controls) {
+  min-width: 0;
+}
+
+
+.racePanel .hero span {
+  display: block;
+
+  font-size: 0.72rem;
+  font-weight: 800;
+
+  letter-spacing: 0.12em;
+
+  color: var(--muted);
+}
+
+
+.racePanel .hero strong {
+  margin-top: 8px;
+
+  font-size: clamp(
+    2.2rem,
+    8vw,
+    4.5rem
+  );
+
+  line-height: 1;
+
+  font-variant-numeric:
+    tabular-nums;
+
+  white-space: nowrap;
+}
+
+
+/* ---------------------------------------------------------
+   RACE CONTROLS
+   --------------------------------------------------------- */
+
+.racePanel .hero .controls {
+  grid-column: 1 / -1;
+
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  gap: 10px;
+
+  width: 100%;
+}
+
+
+.racePanel .hero .controls button {
+  min-height: 58px;
+
+  font-size: 1rem;
+
+  font-weight: 800;
+}
+
+
+.racePanel .hero .controls .resetButton {
+  grid-column: 1 / -1;
+}
+
+
+/* ---------------------------------------------------------
+   CURRENT / NEXT DRIVER
+   --------------------------------------------------------- */
+
+.racePanel .current {
+  padding: 24px;
+}
+
+
+.racePanel .driverStatusGrid {
+  margin:
+    0
+    0
+    20px;
+
+  gap: 16px;
+}
+
+
+.racePanel .driverStatusCurrent,
+.racePanel .driverStatusNext {
+  min-width: 0;
+}
+
+
+.racePanel .driverStatusCurrent span,
+.racePanel .driverStatusNext span {
+  font-size: 0.72rem;
+
+  letter-spacing: 0.12em;
+
+  color: var(--muted);
+}
+
+
+.racePanel .driverStatusCurrent strong,
+.racePanel .driverStatusNext strong {
+  font-size: clamp(
+    1.5rem,
+    5vw,
+    2.2rem
+  );
+
+  font-weight: 600;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+/* ---------------------------------------------------------
+   STINT TIMER
+   --------------------------------------------------------- */
+
+.racePanel .current > b {
+  display: block;
+
+  margin-top: 8px;
+
+  font-size: clamp(
+    1.25rem,
+    4vw,
+    1.7rem
+  );
+
+  letter-spacing: 0.04em;
+}
+
+
+/* ---------------------------------------------------------
+   STINT WARNING
+   --------------------------------------------------------- */
+
+.racePanel .stintWarning {
+  margin-top: 16px;
+}
+
+
+/* ---------------------------------------------------------
+   CHANGE NOTE
+   --------------------------------------------------------- */
+
+.racePanel .activityNote {
+  margin-top: 18px;
+}
+
+
+.racePanel .activityNote input {
+  width: 100%;
+
+  min-height: 54px;
+
+  font-size: 1rem;
+}
+
+
+/* ---------------------------------------------------------
+   CHANGE BUTTONS
+   --------------------------------------------------------- */
+
+.racePanel .swap {
+  margin-top: 18px;
+
+  gap: 10px;
+}
+
+
+.racePanel .swap button {
+  min-height: 58px;
+
+  font-size: 0.95rem;
+
+  font-weight: 800;
+}
+
+
+.racePanel .swap .full {
+  min-height: 64px;
+
+  font-size: 1.05rem;
+}
+
+
+/* ---------------------------------------------------------
+   LIVE RC-RESULTS
+   --------------------------------------------------------- */
+
+.racePanel .liveStats h2 {
+  font-size: clamp(
+    1.3rem,
+    5vw,
+    1.8rem
+  );
+
+  margin: 4px 0;
+}
+
+
+.racePanel .liveStatGrid {
+  gap: 10px;
+}
+
+
+.racePanel .liveStatGrid div {
+  min-height: 82px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
+}
+
+
+.racePanel .liveStatGrid b {
+  font-size: 1.25rem;
+}
+
+
+/* ---------------------------------------------------------
+   LIVE RESULTS FOOTER
+   --------------------------------------------------------- */
+
+.racePanel .liveResultsFooter {
+  margin-top: 14px;
+
+  padding-top: 12px;
+
+  border-top:
+    1px solid var(--line);
+}
+
+
+/* ---------------------------------------------------------
+   REMOVE TIMING SCREEN FROM RACE TAB
+
+   It already has its own dedicated TIMING tab.
+   --------------------------------------------------------- */
+
+.racePanel .timingScreen {
+  display: none;
+}
+
+
+/* =========================================================
+   PHONE RACE DASHBOARD
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  .racePanel {
+    padding:
+      0
+      12px;
+  }
+
+
+  /* -------------------------------------------------------
+     RACE TIMER
+     ------------------------------------------------------- */
+
+  .racePanel .hero {
+    padding: 22px 16px;
+
+    gap: 14px;
+  }
+
+
+  .racePanel .hero strong {
+    font-size: clamp(
+      2rem,
+      10vw,
+      3.2rem
+    );
+  }
+
+
+  .racePanel .hero .controls {
+    margin-top: 4px;
+  }
+
+
+  .racePanel .hero .controls button {
+    min-height: 62px;
+
+    font-size: 1rem;
+  }
+
+
+  /* -------------------------------------------------------
+     DRIVER CARD
+     ------------------------------------------------------- */
+
+  .racePanel .current {
+    padding: 20px 16px;
+  }
+
+
+  .racePanel .driverStatusGrid {
+    gap: 12px;
+
+    margin-bottom: 18px;
+  }
+
+
+  .racePanel .driverStatusCurrent strong,
+  .racePanel .driverStatusNext strong {
+    font-size: clamp(
+      1.35rem,
+      7vw,
+      1.8rem
+    );
+  }
+
+
+  .racePanel .current > b {
+    font-size: 1.35rem;
+  }
+
+
+  /* -------------------------------------------------------
+     CHANGE BUTTONS
+     ------------------------------------------------------- */
+
+  .racePanel .swap {
+    grid-template-columns: 1fr;
+  }
+
+
+  .racePanel .swap button {
+    min-height: 58px;
+  }
+
+
+  .racePanel .swap .full {
+    grid-column: auto;
+
+    min-height: 68px;
+
+    font-size: 1.05rem;
+  }
+
+
+  /* -------------------------------------------------------
+     LIVE RESULTS
+     ------------------------------------------------------- */
+
+  .racePanel .liveStatGrid {
+    grid-template-columns:
+      1fr
+      1fr;
+  }
+
+
+  .racePanel .liveResultsFooter {
+    flex-direction: row;
+
+    align-items: center;
+  }
+
+
+  .racePanel .liveResultsFooter .muted {
+    font-size: 0.72rem;
+  }
+
+
+  .racePanel .lapsStored {
+    font-size: 0.62rem;
+
+    text-align: right;
+  }
+
+}
+
