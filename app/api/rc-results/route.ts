@@ -6,10 +6,19 @@ export const revalidate = 0;
 type LiveTeam = {
   name: string;
   position: number | null;
+
+  car: string | null;
+  driver: string | null;
+  result: string | null;
+
   laps: number | null;
+
   lastLap: number | null;
   bestLap: number | null;
+  best10: number | null;
   averageLap: number | null;
+  predicted: string | null;
+
   resultTotal: number | null;
 };
 
@@ -114,17 +123,65 @@ function parseTeams(html: string): LiveTeam[] {
   const indexOf = (...names: string[]) =>
     headers.findIndex((header) => names.includes(header));
 
-  const positionIndex = indexOf("pos", "position");
-  const carIndex = indexOf("car", "carno", "number");
-  const driverIndex = indexOf("driver", "name", "team");
-  const resultIndex = indexOf("result");
+  const positionIndex =
+  indexOf(
+    "pos",
+    "position"
+  );
 
-  /*
-   * Exact matching is important:
-   * "Best10" must not be selected when looking for "Best".
-   */
-  const bestIndex = indexOf("best", "bestlap");
-  const best10Index = indexOf("best10");
+const carIndex =
+  indexOf(
+    "car",
+    "carno",
+    "number"
+  );
+
+const driverIndex =
+  indexOf(
+    "driver",
+    "name",
+    "team"
+  );
+
+const resultIndex =
+  indexOf(
+    "result"
+  );
+
+const lastLapIndex =
+  indexOf(
+    "lastlap",
+    "last"
+  );
+
+/*
+ * Exact matching is important:
+ * "Best10" must not be selected
+ * when looking for "Best".
+ */
+const bestIndex =
+  indexOf(
+    "best",
+    "bestlap"
+  );
+
+const best10Index =
+  indexOf(
+    "best10",
+    "bestten"
+  );
+
+const averageIndex =
+  indexOf(
+    "average",
+    "avg"
+  );
+
+const predictedIndex =
+  indexOf(
+    "predicted",
+    "prediction"
+  );
 
   const teams: LiveTeam[] = [];
 
@@ -150,39 +207,74 @@ function parseTeams(html: string): LiveTeam[] {
 
     const resultData = parseResult(result);
 
-    teams.push({
-      name,
-      position:
-        positionIndex >= 0
-          ? parseNumber(row[positionIndex])
-          : null,
-      laps: resultData.laps,
-      resultTotal: resultData.total,
+teams.push({
+  name,
 
-      /*
-       * The supplied RC-Results table has no Last Lap column.
-       * Last Lap is therefore calculated in page.tsx from the
-       * newest captured lap.
-       */
-      lastLap: null,
+  position:
+    positionIndex >= 0
+      ? parseNumber(
+          row[positionIndex]
+        )
+      : null,
 
-      /*
-       * Correctly read the "Best" column, not "Best10".
-       */
-      bestLap:
-        bestIndex >= 0
-          ? parseTime(row[bestIndex])
-          : null,
+  car:
+    carIndex >= 0
+      ? row[carIndex] ?? null
+      : null,
 
-      /*
-       * Best10 is kept as a fallback. The dashboard calculates
-       * its displayed average from all captured lap times.
-       */
-      averageLap:
-        best10Index >= 0
-          ? parseTime(row[best10Index])
-          : null,
-    });
+  driver:
+    driverIndex >= 0
+      ? row[driverIndex] ?? null
+      : null,
+
+  result:
+    resultIndex >= 0
+      ? row[resultIndex] ?? null
+      : null,
+
+  laps:
+    resultData.laps,
+
+  resultTotal:
+    resultData.total,
+
+  lastLap:
+    lastLapIndex >= 0
+      ? parseTime(
+          row[lastLapIndex]
+        )
+      : null,
+
+  bestLap:
+    bestIndex >= 0
+      ? parseTime(
+          row[bestIndex]
+        )
+      : null,
+
+  best10:
+    best10Index >= 0
+      ? parseTime(
+          row[best10Index]
+        )
+      : null,
+
+  averageLap:
+    averageIndex >= 0
+      ? parseTime(
+          row[averageIndex]
+        )
+      : best10Index >= 0
+        ? parseTime(
+            row[best10Index]
+          )
+        : null,
+
+  predicted:
+    predictedIndex >= 0
+      ? row[predictedIndex] ?? null
+      : null,
+});
   }
 
   return Array.from(
