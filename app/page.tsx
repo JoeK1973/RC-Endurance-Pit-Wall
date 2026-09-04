@@ -4276,20 +4276,18 @@ const stintLaps = raceLaps.filter(
     </button>
 
   </div>
-  <button
-  className="mobileMenuButton"
-  onClick={() =>
-    setShowMobileMenu(
-      (value) => !value
-    )
-  }
-  aria-label="Open menu"
-  title="Menu"
->
-  {showMobileMenu
-    ? "✕"
-    : "•••"}
-</button>
+<button
+    className="mobileMenuButton"
+    onClick={() =>
+      setShowMobileMenu(
+        (value) => !value
+      )
+    }
+    aria-label="Open header menu"
+    aria-expanded={showMobileMenu}
+  >
+    •••
+  </button>
 </div>
       </header>
 
