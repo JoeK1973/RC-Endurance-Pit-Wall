@@ -2210,3 +2210,132 @@ main {
   background: #20a05a;
   opacity: 1;
 }
+
+/* =========================================================
+   MOBILE HEADER MENU
+   ========================================================= */
+
+.mobileMenuButton {
+  display: none;
+
+  width: 44px;
+  height: 44px;
+
+  padding: 0;
+
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid var(--line);
+  border-radius: 12px;
+
+  background: var(--card);
+  color: var(--text);
+
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+/* =========================================================
+   MOBILE / TABLET HEADER
+   ========================================================= */
+
+@media (max-width: 800px) {
+
+  header {
+    width: 100%;
+    max-width: 100%;
+
+    gap: 10px;
+
+    padding-right: 12px;
+  }
+
+  .headerRight {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  /*
+   * Keep the traffic lights visible.
+   */
+  .trafficLights {
+    flex-shrink: 0;
+  }
+
+  /*
+   * Hide all the other header icons
+   * until the menu is opened.
+   */
+  .headerActions > button {
+    display: none;
+  }
+
+  /*
+   * Keep the traffic lights visible.
+   */
+  .headerActions {
+    display: flex;
+  }
+
+  /*
+   * Show the three-dot menu.
+   */
+  .mobileMenuButton {
+    display: flex;
+  }
+
+  /*
+   * When the menu is open, show
+   * the header action buttons below.
+   */
+  .headerRight:has(
+    .mobileMenuButton[aria-expanded="true"]
+  ) {
+    position: relative;
+  }
+
+  .headerRight:has(
+    .mobileMenuButton[aria-expanded="true"]
+  )
+  .headerActions {
+    position: absolute;
+
+    top: calc(100% + 8px);
+    right: 0;
+
+    display: grid;
+
+    grid-template-columns:
+      repeat(3, 48px);
+
+    gap: 8px;
+
+    padding: 10px;
+
+    border: 1px solid var(--line);
+    border-radius: 14px;
+
+    background: var(--card);
+
+    box-shadow:
+      0 12px 30px
+      rgba(0, 0, 0, 0.18);
+
+    z-index: 500;
+  }
+
+  .headerRight:has(
+    .mobileMenuButton[aria-expanded="true"]
+  )
+  .headerActions > button {
+    display: block;
+
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+
+    padding: 0;
+  }
+}
+
