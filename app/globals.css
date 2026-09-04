@@ -1502,3 +1502,96 @@ html[data-theme="dark"] .clearAllDataButton {
 .clearAllDataButton:hover {
   transform: translateY(-1px);
 }
+
+/* =========================
+   TIMING SCREEN
+   ========================= */
+
+.timingScreen {
+  overflow: hidden;
+}
+
+.timingScreenWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.timingScreenTable {
+  width: 100%;
+  min-width: 950px;
+  border-collapse: collapse;
+  font-variant-numeric:
+    tabular-nums;
+}
+
+.timingScreenTable th {
+  padding:
+    10px
+    12px;
+
+  text-align: left;
+
+  font-size: 0.68rem;
+
+  letter-spacing: 0.08em;
+
+  color: var(--muted);
+
+  border-bottom:
+    1px solid
+    var(--line);
+
+  white-space: nowrap;
+}
+
+.timingScreenTable td {
+  padding:
+    11px
+    12px;
+
+  border-bottom:
+    1px solid
+    var(--line);
+
+  white-space: nowrap;
+
+  font-size: 0.9rem;
+}
+
+.timingScreenTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.timingScreenTable tbody tr {
+  transition:
+    background
+    0.15s ease;
+}
+
+.timingScreenTable tbody tr:hover {
+  background:
+    var(--soft);
+}
+
+.timingDriver {
+  font-weight: 600;
+}
+
+.trackedTimingRow {
+  background:
+    color-mix(
+      in srgb,
+      var(--accent) 12%,
+      transparent
+    );
+}
+
+.trackedTimingRow td:first-child {
+  font-weight: 800;
+}
+
+.timingEmpty {
+  padding: 28px !important;
+  text-align: center !important;
+  color: var(--muted);
+}
