@@ -1811,11 +1811,11 @@ header {
 
 
   /*
-   * Hide the header action buttons
+   * Hide the entire header actions group
    * until the three-dot menu is opened.
    */
-  .headerActions > button {
-    display: none;
+  .headerActions {
+    display: none !important;
   }
 
 
@@ -1861,7 +1861,7 @@ header {
     top: calc(100% + 8px);
     right: 0;
 
-    display: grid;
+    display: grid !important;
 
     grid-template-columns:
       repeat(3, 52px);
@@ -1889,7 +1889,7 @@ header {
    */
   .headerRight.mobileMenuOpen
   .headerActions > button {
-    display: flex;
+    display: flex !important;
 
     align-items: center;
     justify-content: center;
