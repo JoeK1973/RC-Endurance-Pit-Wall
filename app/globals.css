@@ -3123,3 +3123,287 @@ main {
 
 }
 
+/* =========================================================
+   PHASE 2 — STEP 3
+   PIT WALL DRIVER CONTROL
+   ========================================================= */
+
+
+/* ---------------------------------------------------------
+   CURRENT / NEXT DRIVER
+   --------------------------------------------------------- */
+
+.racePanel .current {
+  position: relative;
+
+  overflow: hidden;
+}
+
+
+/*
+ * Give the driver information area more structure.
+ */
+
+.racePanel .driverStatusGrid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.25fr)
+    minmax(0, 1fr);
+
+  gap: 0;
+
+  margin-bottom: 0;
+
+  border:
+    1px solid var(--line);
+
+  border-radius: 14px;
+
+  overflow: hidden;
+}
+
+
+.racePanel .driverStatusCurrent,
+.racePanel .driverStatusNext {
+  padding: 18px;
+
+  min-width: 0;
+}
+
+
+/*
+ * Make the current driver visually
+ * more important.
+ */
+
+.racePanel .driverStatusCurrent {
+  border-right:
+    1px solid var(--line);
+}
+
+
+.racePanel .driverStatusCurrent span,
+.racePanel .driverStatusNext span {
+  display: block;
+
+  margin-bottom: 8px;
+
+  font-size: 0.68rem;
+
+  font-weight: 800;
+
+  letter-spacing: 0.12em;
+}
+
+
+.racePanel .driverStatusCurrent strong {
+  display: block;
+
+  font-size: clamp(
+    1.5rem,
+    5vw,
+    2.4rem
+  );
+
+  line-height: 1.1;
+}
+
+
+.racePanel .driverStatusNext strong {
+  display: block;
+
+  font-size: clamp(
+    1.2rem,
+    4vw,
+    1.8rem
+  );
+
+  line-height: 1.1;
+}
+
+
+/* ---------------------------------------------------------
+   STINT TIME
+   --------------------------------------------------------- */
+
+/*
+ * Turn the existing stint timer into
+ * a central race-status section.
+ */
+
+.racePanel .current > b {
+  display: block;
+
+  margin: 0;
+
+  padding: 20px;
+
+  text-align: center;
+
+  border-left:
+    1px solid var(--line);
+
+  border-right:
+    1px solid var(--line);
+
+  border-bottom:
+    1px solid var(--line);
+
+  font-size: clamp(
+    1.5rem,
+    5vw,
+    2.2rem
+  );
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* ---------------------------------------------------------
+   STINT WARNING
+   --------------------------------------------------------- */
+
+.racePanel .stintWarning {
+  margin-top: 14px;
+
+  padding: 12px 14px;
+
+  border-radius: 12px;
+}
+
+
+/* ---------------------------------------------------------
+   CHANGE NOTE
+   --------------------------------------------------------- */
+
+.racePanel .activityNote {
+  margin-top: 18px;
+}
+
+
+.racePanel .activityNote input {
+  min-height: 52px;
+
+  padding:
+    12px
+    14px;
+
+  border-radius: 12px;
+}
+
+
+/* ---------------------------------------------------------
+   SWAP CONTROLS
+   --------------------------------------------------------- */
+
+.racePanel .swap {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin-top: 14px;
+}
+
+
+.racePanel .swap button {
+  min-height: 60px;
+
+  padding:
+    12px
+    14px;
+
+  border-radius: 12px;
+
+  font-size: 0.9rem;
+
+  font-weight: 800;
+
+  white-space: normal;
+}
+
+
+/*
+ * Full change becomes the primary,
+ * full-width action.
+ */
+
+.racePanel .swap .full {
+  grid-column: 1 / -1;
+
+  min-height: 68px;
+
+  font-size: 1.05rem;
+}
+
+
+/* =========================================================
+   PHONE OPTIMISATION
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  .racePanel .driverStatusGrid {
+    grid-template-columns:
+      minmax(0, 1.2fr)
+      minmax(0, 0.9fr);
+  }
+
+
+  .racePanel .driverStatusCurrent,
+  .racePanel .driverStatusNext {
+    padding: 16px 14px;
+  }
+
+
+  .racePanel .driverStatusCurrent strong {
+    font-size: clamp(
+      1.35rem,
+      6.5vw,
+      1.9rem
+    );
+  }
+
+
+  .racePanel .driverStatusNext strong {
+    font-size: clamp(
+      1.05rem,
+      5vw,
+      1.45rem
+    );
+  }
+
+
+  .racePanel .current > b {
+    padding: 18px 12px;
+
+    font-size: clamp(
+      1.35rem,
+      6vw,
+      1.8rem
+    );
+  }
+
+
+  /*
+   * Stack the change controls so
+   * every action has a large touch target.
+   */
+
+  .racePanel .swap {
+    grid-template-columns: 1fr;
+  }
+
+
+  .racePanel .swap .full {
+    grid-column: auto;
+
+    min-height: 68px;
+  }
+
+}
+
