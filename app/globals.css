@@ -1734,15 +1734,20 @@ html[data-theme="dark"] .clearAllDataButton {
      HEADER
      --------------------------------------- */
 
-  header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
 
-    padding: 8px 12px;
+  width: 100%;
+  max-width: 100vw;
 
-    background: var(--bg);
-  }
+  padding: 8px 16px;
+
+  background: var(--bg);
+
+  box-sizing: border-box;
+}
 
 
   .siteLogo img {
@@ -1817,35 +1822,44 @@ html[data-theme="dark"] .clearAllDataButton {
      MOBILE MENU BUTTON
      --------------------------------------- */
 
-  .mobileMenuButton {
-    display: grid;
-    place-items: center;
+.mobileMenuButton {
+  display: grid;
+  place-items: center;
 
-    width: 48px;
-    height: 48px;
+  flex: 0 0 auto;
 
-    padding: 0;
+  width: 44px;
+  height: 44px;
 
-    font-size: 1.25rem;
-    line-height: 1;
+  margin-right: 4px;
 
-    border: 1px solid var(--line);
-    border-radius: 12px;
+  padding: 0;
 
-    background: var(--card);
-    color: var(--text);
+  font-size: 1.2rem;
+  line-height: 1;
 
-    cursor: pointer;
-  }
+  border: 1px solid var(--line);
+  border-radius: 12px;
+
+  background: var(--card);
+  color: var(--text);
+
+  cursor: pointer;
+}
 
 
   /*
    * Keep messages usable without
    * taking over the whole header.
    */
-  .headerRight {
-    gap: 8px;
-  }
+.headerRight {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  padding-right: 8px;
+}
 
 
   .headerMessage {
@@ -1874,53 +1888,61 @@ html[data-theme="dark"] .clearAllDataButton {
      BOTTOM NAVIGATION
      --------------------------------------- */
 
-  .appTabs {
-    position: fixed;
+.appTabs {
+  position: fixed;
 
-    left: 0;
-    right: 0;
-    bottom: 0;
+  left: 0;
+  bottom: 0;
 
-    z-index: 200;
+  width: 100%;
+  max-width: 100vw;
 
-    display: grid;
+  z-index: 200;
 
-    grid-template-columns:
-      repeat(5, 1fr);
+  display: grid;
 
-    gap: 0;
+  grid-template-columns:
+    repeat(5, minmax(0, 1fr));
 
-    padding: 6px 4px
-      calc(
-        6px +
-        env(safe-area-inset-bottom)
-      );
+  gap: 0;
 
-    background: var(--card);
+  padding:
+    6px 4px
+    calc(
+      6px +
+      env(safe-area-inset-bottom)
+    );
 
-    border-top:
-      1px solid var(--line);
-  }
+  background: var(--card);
+
+  border-top:
+    1px solid var(--line);
+
+  overflow: hidden;
+}
 
 
-  .appTab {
-    min-width: 0;
-    min-height: 60px;
+.appTab {
+  width: 100%;
+  min-width: 0;
+  min-height: 60px;
 
-    padding: 5px 2px;
+  padding: 5px 1px;
 
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 
-    gap: 3px;
+  gap: 3px;
 
-    border: 0;
-    border-radius: 10px;
+  overflow: hidden;
 
-    background: transparent;
-  }
+  border: 0;
+  border-radius: 10px;
+
+  background: transparent;
+}
 
 
   .tabIcon {
@@ -1931,15 +1953,25 @@ html[data-theme="dark"] .clearAllDataButton {
   }
 
 
-  .tabLabel {
-    display: block;
+.tabLabel {
+  display: block;
 
-    font-size: 0.55rem;
+  width: 100%;
 
-    font-weight: 800;
+  overflow: hidden;
 
-    letter-spacing: 0.04em;
-  }
+  font-size: 0.52rem;
+  line-height: 1.1;
+
+  font-weight: 800;
+
+  letter-spacing: 0.02em;
+
+  text-align: center;
+
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 
   .appTab.active {
@@ -2058,6 +2090,46 @@ html[data-theme="dark"] .clearAllDataButton {
     justify-content: center;
 
     min-height: 42px;
+  }
+
+}
+
+/* =========================================================
+   MOBILE WIDTH FIX
+   ========================================================= */
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+main {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 700px) {
+
+  body {
+    overflow-x: hidden;
+  }
+
+  main {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .card,
+  .panel,
+  section {
+    max-width: 100%;
   }
 
 }
