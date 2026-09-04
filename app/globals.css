@@ -1595,3 +1595,469 @@ html[data-theme="dark"] .clearAllDataButton {
   text-align: center !important;
   color: var(--muted);
 }
+
+/* =========================================================
+   RC ENDURANCE PIT WALL
+   RESPONSIVE APP SHELL
+   ========================================================= */
+
+
+/* -----------------------------------------
+   TAB ICONS
+   ----------------------------------------- */
+
+.tabIcon {
+  display: none;
+}
+
+.tabLabel {
+  display: inline;
+}
+
+
+/* -----------------------------------------
+   MOBILE MENU BUTTON
+   ----------------------------------------- */
+
+.mobileMenuButton {
+  display: none;
+}
+
+
+/* -----------------------------------------
+   TIMING TAB VISIBILITY
+   ----------------------------------------- */
+
+[data-tab="timing"] .racePanel,
+[data-tab="timing"] .raceOnly,
+[data-tab="timing"] .teamOnly,
+[data-tab="timing"] .analysisOnly,
+[data-tab="timing"] .strategyOnly {
+  display: none !important;
+}
+
+.timingOnly {
+  display: none;
+}
+
+[data-tab="timing"] .timingOnly {
+  display: block;
+}
+
+
+/* -----------------------------------------
+   TIMING PLACEHOLDER
+   ----------------------------------------- */
+
+.timingScreenPage {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.timingScreenHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 18px;
+}
+
+.timingScreenHeader span {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.timingScreenHeader h2 {
+  margin: 4px 0 0;
+}
+
+.timingLiveStatus {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.timingLiveStatus span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+
+  background: #39c16c;
+}
+
+.timingComingSoon {
+  min-height: 300px;
+
+  display: grid;
+  place-content: center;
+
+  text-align: center;
+
+  border: 1px solid var(--line);
+  border-radius: 18px;
+
+  background: var(--card);
+}
+
+.timingComingSoon strong {
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+}
+
+.timingComingSoon p {
+  color: var(--muted);
+}
+
+
+/* =========================================================
+   PHONE LAYOUT
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  /*
+   * Make room for the fixed bottom navigation.
+   */
+  main {
+    padding-bottom: 86px;
+  }
+
+
+  /* ---------------------------------------
+     HEADER
+     --------------------------------------- */
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+
+    padding: 8px 12px;
+
+    background: var(--bg);
+  }
+
+
+  .siteLogo img {
+    max-height: 48px;
+    width: auto;
+  }
+
+
+  /*
+   * Hide the normal desktop icon row.
+   * It becomes a pop-out menu.
+   */
+  .headerActions {
+    display: none;
+
+    position: absolute;
+
+    top: calc(100% + 8px);
+    right: 10px;
+
+    width: min(
+      280px,
+      calc(100vw - 20px)
+    );
+
+    padding: 10px;
+
+    flex-direction: column;
+    align-items: stretch;
+
+    background: var(--card);
+
+    border: 1px solid var(--line);
+    border-radius: 16px;
+
+    box-shadow:
+      0 18px 45px
+      rgba(0, 0, 0, 0.22);
+  }
+
+
+  .headerActions.mobileMenuOpen {
+    display: flex;
+  }
+
+
+  /*
+   * Turn each existing header icon
+   * into a full-width touch target.
+   */
+  .headerActions .icon,
+  .headerActions .leaveIconButton {
+    width: 100%;
+    min-height: 48px;
+
+    justify-content: flex-start;
+
+    border-radius: 10px;
+  }
+
+
+  /*
+   * Keep the traffic lights visible
+   * at the top of the menu.
+   */
+  .headerActions .trafficLights {
+    margin: 4px auto 12px;
+  }
+
+
+  /* ---------------------------------------
+     MOBILE MENU BUTTON
+     --------------------------------------- */
+
+  .mobileMenuButton {
+    display: grid;
+    place-items: center;
+
+    width: 48px;
+    height: 48px;
+
+    padding: 0;
+
+    font-size: 1.25rem;
+    line-height: 1;
+
+    border: 1px solid var(--line);
+    border-radius: 12px;
+
+    background: var(--card);
+    color: var(--text);
+
+    cursor: pointer;
+  }
+
+
+  /*
+   * Keep messages usable without
+   * taking over the whole header.
+   */
+  .headerRight {
+    gap: 8px;
+  }
+
+
+  .headerMessage {
+    position: fixed;
+
+    top: 68px;
+    left: 12px;
+    right: 12px;
+
+    z-index: 110;
+
+    text-align: center;
+
+    background: var(--card);
+    border: 1px solid var(--line);
+
+    border-radius: 10px;
+
+    box-shadow:
+      0 10px 30px
+      rgba(0, 0, 0, 0.18);
+  }
+
+
+  /* ---------------------------------------
+     BOTTOM NAVIGATION
+     --------------------------------------- */
+
+  .appTabs {
+    position: fixed;
+
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    z-index: 200;
+
+    display: grid;
+
+    grid-template-columns:
+      repeat(5, 1fr);
+
+    gap: 0;
+
+    padding: 6px 4px
+      calc(
+        6px +
+        env(safe-area-inset-bottom)
+      );
+
+    background: var(--card);
+
+    border-top:
+      1px solid var(--line);
+  }
+
+
+  .appTab {
+    min-width: 0;
+    min-height: 60px;
+
+    padding: 5px 2px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    gap: 3px;
+
+    border: 0;
+    border-radius: 10px;
+
+    background: transparent;
+  }
+
+
+  .tabIcon {
+    display: block;
+
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+
+
+  .tabLabel {
+    display: block;
+
+    font-size: 0.55rem;
+
+    font-weight: 800;
+
+    letter-spacing: 0.04em;
+  }
+
+
+  .appTab.active {
+    background: var(--soft);
+  }
+
+
+  /* ---------------------------------------
+     GENERAL MOBILE CONTENT
+     --------------------------------------- */
+
+  .tabPanel,
+  .timingScreenPage {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+
+  .card {
+    border-radius: 16px;
+  }
+
+
+  /*
+   * Make large action buttons easier
+   * to press during a race.
+   */
+  button {
+    min-height: 44px;
+  }
+
+
+  /* ---------------------------------------
+     RACE TIMER
+     --------------------------------------- */
+
+  .hero {
+    grid-template-columns:
+      1fr 1fr;
+  }
+
+
+  .hero .controls {
+    grid-column: 1 / -1;
+
+    display: grid;
+
+    grid-template-columns:
+      repeat(3, 1fr);
+  }
+
+
+  .hero strong {
+    font-size: clamp(
+      1.6rem,
+      9vw,
+      2.5rem
+    );
+  }
+
+
+  /* ---------------------------------------
+     TABLES
+     --------------------------------------- */
+
+  .historyTableWrap,
+  .timingScreenWrap {
+    overflow-x: auto;
+
+    -webkit-overflow-scrolling:
+      touch;
+  }
+
+
+  /* ---------------------------------------
+     STRATEGY
+     --------------------------------------- */
+
+  .strategyInputs {
+    grid-template-columns: 1fr;
+  }
+
+
+  /* ---------------------------------------
+     GRAPHS
+     --------------------------------------- */
+
+  .driverCharts {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+
+/* =========================================================
+   TABLET AND DESKTOP
+   ========================================================= */
+
+@media (min-width: 701px) {
+
+  .mobileMenuButton {
+    display: none;
+  }
+
+
+  .appTabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+
+  .appTab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 42px;
+  }
+
+}
