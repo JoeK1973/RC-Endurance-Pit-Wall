@@ -4116,7 +4116,11 @@ const stintLaps = raceLaps.filter(
 
         </div>
 
-<div className="headerRight">
+<div
+  className={`headerRight ${
+    showMobileMenu ? "mobileMenuOpen" : ""
+  }`}
+>
   {message && (
     <div
       className="headerMessage"
