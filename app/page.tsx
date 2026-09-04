@@ -90,11 +90,21 @@ type LiveResultsConfig = {
 
 type LiveTeam = {
   name: string;
+
   position?: number | null;
+
+  car?: string | null;
+  driver?: string | null;
+  result?: string | null;
+
   laps?: number | null;
+
   lastLap?: number | null;
   bestLap?: number | null;
+  best10?: number | null;
   averageLap?: number | null;
+  predicted?: string | null;
+
   driverResultUrl?: string | null;
 };
 
@@ -2686,6 +2696,16 @@ setStrategyRaceMinutes(
             );
           }
 
+          if (
+  Array.isArray(
+    data.teams
+  )
+) {
+  setLiveTeams(
+    data.teams as LiveTeam[]
+  );
+}
+
 let incomingLaps: LiveLap[] =
   Array.isArray(data.lapData)
     ? data.lapData
@@ -4601,6 +4621,173 @@ const stintLaps = raceLaps.filter(
             </div>
           )}
         </article>
+
+                {/* TIMING SCREEN */}
+
+        <article className="card timingScreen raceOnly">
+          <div className="titleRow">
+            <span>
+              TIMING SCREEN
+            </span>
+
+            {liveResultsConfig?.enabled && (
+              <small>
+                ● LIVE
+              </small>
+            )}
+          </div>
+
+          {!liveResultsConfig?.enabled ? (
+            <p className="muted">
+              Connect RC-Results above to display
+              the live timing screen.
+            </p>
+          ) : (
+            <div className="timingScreenWrap">
+              <table className="timingScreenTable">
+
+                <thead>
+                  <tr>
+                    <th>
+                      POSITION
+                    </th>
+
+                    <th>
+                      CAR
+                    </th>
+
+                    <th>
+                      DRIVER
+                    </th>
+
+                    <th>
+                      RESULT
+                    </th>
+
+                    <th>
+                      LAST LAP
+                    </th>
+
+                    <th>
+                      BEST LAP
+                    </th>
+
+                    <th>
+                      BEST 10
+                    </th>
+
+                    <th>
+                      AVERAGE
+                    </th>
+
+                    <th>
+                      PREDICTED
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {liveTeams
+                    .slice()
+                    .sort(
+                      (a, b) =>
+                        Number(
+                          a.position ??
+                            9999
+                        ) -
+                        Number(
+                          b.position ??
+                            9999
+                        )
+                    )
+                    .map(
+                      (team) => {
+                        const isTrackedTeam =
+                          team.name ===
+                          liveResultsConfig.team_name;
+
+                        return (
+                          <tr
+                            key={
+                              `${team.position}-${team.name}`
+                            }
+                            className={
+                              isTrackedTeam
+                                ? "trackedTimingRow"
+                                : ""
+                            }
+                          >
+                            <td>
+                              {team.position ??
+                                "--"}
+                            </td>
+
+                            <td>
+                              {team.car ??
+                                "--"}
+                            </td>
+
+                            <td className="timingDriver">
+                              {team.driver ??
+                                team.name ??
+                                "--"}
+                            </td>
+
+                            <td>
+                              {team.result ??
+                                "--"}
+                            </td>
+
+                            <td>
+                              {fmtLap(
+                                team.lastLap
+                              )}
+                            </td>
+
+                            <td>
+                              {fmtLap(
+                                team.bestLap
+                              )}
+                            </td>
+
+                            <td>
+                              {fmtLap(
+                                team.best10
+                              )}
+                            </td>
+
+                            <td>
+                              {fmtLap(
+                                team.averageLap
+                              )}
+                            </td>
+
+                            <td>
+                              {team.predicted ??
+                                "--"}
+                            </td>
+                          </tr>
+                        );
+                      }
+                    )}
+
+                  {liveTeams.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="timingEmpty"
+                      >
+                        Waiting for live timing data...
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+
+              </table>
+            </div>
+          )}
+        </article>
+
 
         {/* ACTIVITY TRACKER */}
 
