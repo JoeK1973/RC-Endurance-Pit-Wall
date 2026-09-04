@@ -2835,3 +2835,291 @@ main {
 
 }
 
+/* =========================================================
+   PHASE 2 — STEP 2
+   COMPACT LIVE RC-RESULTS
+   ========================================================= */
+
+
+/* ---------------------------------------------------------
+   LIVE RC-RESULTS CARD
+   --------------------------------------------------------- */
+
+.racePanel .liveStats {
+  margin-top: 2px;
+}
+
+
+/*
+ * Keep the team name and STOP button compact.
+ */
+
+.racePanel .liveStats .titleRow {
+  align-items: center;
+  gap: 12px;
+}
+
+
+.racePanel .liveStats h2 {
+  margin: 0;
+
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.racePanel .liveStats .danger {
+  flex: 0 0 auto;
+
+  min-width: 76px;
+}
+
+
+/* ---------------------------------------------------------
+   LIVE STAT GRID
+   --------------------------------------------------------- */
+
+.racePanel .liveStatGrid {
+  margin-top: 14px;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 10px;
+}
+
+
+.racePanel .liveStatGrid div {
+  min-height: 76px;
+
+  padding: 12px 14px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
+}
+
+
+.racePanel .liveStatGrid span {
+  margin-bottom: 6px;
+
+  font-size: 0.68rem;
+
+  letter-spacing: 0.1em;
+}
+
+
+.racePanel .liveStatGrid b {
+  font-size: clamp(
+    1.15rem,
+    4vw,
+    1.5rem
+  );
+
+  line-height: 1;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* ---------------------------------------------------------
+   LIVE RESULTS FOOTER
+   --------------------------------------------------------- */
+
+.racePanel .liveResultsFooter {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 12px;
+
+  margin-top: 12px;
+
+  padding-top: 12px;
+
+  border-top:
+    1px solid var(--line);
+}
+
+
+.racePanel .liveResultsFooter .muted {
+  margin: 0;
+
+  font-size: 0.72rem;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/*
+ * Make the stored lap count look like
+ * a compact race-data counter.
+ */
+
+.racePanel .lapsStored {
+  flex: 0 0 auto;
+
+  padding:
+    7px
+    10px;
+
+  border:
+    1px solid var(--line);
+
+  border-radius: 10px;
+
+  background: var(--soft);
+
+  font-size: 0.62rem;
+
+  letter-spacing: 0.07em;
+}
+
+
+.racePanel .lapsStored b {
+  font-size: 0.9rem;
+}
+
+
+/* =========================================================
+   PHONE OPTIMISATION
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  /*
+   * Make the whole card slightly tighter.
+   */
+
+  .racePanel .liveStats {
+    padding-top: 2px;
+  }
+
+
+  /*
+   * Team name remains prominent without
+   * pushing the STOP button off-screen.
+   */
+
+  .racePanel .liveStats h2 {
+    font-size: 1.45rem;
+  }
+
+
+  .racePanel .liveStats .danger {
+    min-width: 70px;
+
+    min-height: 48px;
+
+    padding:
+      0
+      12px;
+  }
+
+
+  /*
+   * Compact but still easy-to-read stat boxes.
+   */
+
+  .racePanel .liveStatGrid {
+    gap: 8px;
+
+    margin-top: 12px;
+  }
+
+
+  .racePanel .liveStatGrid div {
+    min-height: 72px;
+
+    padding:
+      11px
+      12px;
+  }
+
+
+  .racePanel .liveStatGrid span {
+    font-size: 0.62rem;
+
+    margin-bottom: 5px;
+  }
+
+
+  .racePanel .liveStatGrid b {
+    font-size: 1.3rem;
+  }
+
+
+  /*
+   * Put the tracking message and stored laps
+   * on one compact row where possible.
+   */
+
+  .racePanel .liveResultsFooter {
+    flex-direction: row;
+
+    align-items: center;
+
+    gap: 8px;
+  }
+
+
+  .racePanel .liveResultsFooter .muted {
+    font-size: 0.65rem;
+  }
+
+
+  .racePanel .lapsStored {
+    padding:
+      6px
+      8px;
+
+    font-size: 0.55rem;
+  }
+
+
+  .racePanel .lapsStored b {
+    font-size: 0.8rem;
+  }
+
+}
+
+
+/* =========================================================
+   SMALL PHONE FALLBACK
+   ========================================================= */
+
+@media (max-width: 380px) {
+
+  /*
+   * On very narrow phones, allow the footer
+   * to stack instead of becoming cramped.
+   */
+
+  .racePanel .liveResultsFooter {
+    flex-direction: column;
+
+    align-items: stretch;
+  }
+
+
+  .racePanel .liveResultsFooter .muted {
+    white-space: normal;
+  }
+
+
+  .racePanel .lapsStored {
+    align-self: flex-end;
+  }
+
+}
+
