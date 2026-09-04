@@ -298,8 +298,19 @@ export default function Home() {
   const [activityNote, setActivityNote] =
     useState("");
 
-  const [activeTab, setActiveTab] =
-    useState<"race" | "team" | "analysis" | "strategy">("race");
+const [activeTab, setActiveTab] =
+  useState<
+    "race" |
+    "team" |
+    "analysis" |
+    "strategy" |
+    "timing"
+  >("race");
+
+const [
+  showMobileMenu,
+  setShowMobileMenu,
+] = useState(false);
 
   const [stintTargetMinutes, setStintTargetMinutes] =
     useState(20);
@@ -4115,7 +4126,13 @@ const stintLaps = raceLaps.filter(
     </div>
   )}
 
-  <div className="headerActions">
+<div
+  className={`headerActions ${
+    showMobileMenu
+      ? "mobileMenuOpen"
+      : ""
+  }`}
+>
 
     {/* SESSION TRAFFIC LIGHTS */}
     <div
@@ -4259,15 +4276,127 @@ const stintLaps = raceLaps.filter(
     </button>
 
   </div>
+  <button
+  className="mobileMenuButton"
+  onClick={() =>
+    setShowMobileMenu(
+      (value) => !value
+    )
+  }
+  aria-label="Open menu"
+  title="Menu"
+>
+  {showMobileMenu
+    ? "✕"
+    : "•••"}
+</button>
 </div>
       </header>
 
-      <nav className="appTabs" aria-label="Dashboard sections">
-        <button className={`appTab raceTab ${activeTab === "race" ? "active" : ""}`} onClick={() => setActiveTab("race")}>RACE</button>
-        <button className={`appTab teamTab ${activeTab === "team" ? "active" : ""}`} onClick={() => setActiveTab("team")}>TEAM</button>
-        <button className={`appTab analysisTab ${activeTab === "analysis" ? "active" : ""}`} onClick={() => setActiveTab("analysis")}>ANALYSIS</button>
-        <button className={`appTab strategyTab ${activeTab === "strategy" ? "active" : ""}`} onClick={() => setActiveTab("strategy")}>STRATEGY</button>
-      </nav>
+<nav
+  className="appTabs"
+  aria-label="Dashboard sections"
+>
+  <button
+    className={`appTab raceTab ${
+      activeTab === "race"
+        ? "active"
+        : ""
+    }`}
+    onClick={() => {
+      setActiveTab("race");
+      setShowMobileMenu(false);
+    }}
+  >
+    <span className="tabIcon">
+      🏁
+    </span>
+
+    <span className="tabLabel">
+      RACE
+    </span>
+  </button>
+
+  <button
+    className={`appTab teamTab ${
+      activeTab === "team"
+        ? "active"
+        : ""
+    }`}
+    onClick={() => {
+      setActiveTab("team");
+      setShowMobileMenu(false);
+    }}
+  >
+    <span className="tabIcon">
+      👥
+    </span>
+
+    <span className="tabLabel">
+      TEAM
+    </span>
+  </button>
+
+  <button
+    className={`appTab analysisTab ${
+      activeTab === "analysis"
+        ? "active"
+        : ""
+    }`}
+    onClick={() => {
+      setActiveTab("analysis");
+      setShowMobileMenu(false);
+    }}
+  >
+    <span className="tabIcon">
+      📊
+    </span>
+
+    <span className="tabLabel">
+      ANALYSIS
+    </span>
+  </button>
+
+  <button
+    className={`appTab strategyTab ${
+      activeTab === "strategy"
+        ? "active"
+        : ""
+    }`}
+    onClick={() => {
+      setActiveTab("strategy");
+      setShowMobileMenu(false);
+    }}
+  >
+    <span className="tabIcon">
+      🎯
+    </span>
+
+    <span className="tabLabel">
+      STRATEGY
+    </span>
+  </button>
+
+  <button
+    className={`appTab timingTab ${
+      activeTab === "timing"
+        ? "active"
+        : ""
+    }`}
+    onClick={() => {
+      setActiveTab("timing");
+      setShowMobileMenu(false);
+    }}
+  >
+    <span className="tabIcon">
+      🖥
+    </span>
+
+    <span className="tabLabel">
+      TIMING
+    </span>
+  </button>
+</nav>
 
 <div className="tabPanel racePanel" hidden={activeTab !== "race"}>
       {/* RACE TIMER */}
@@ -6529,6 +6658,40 @@ onChange={(event) => {
           </table>
         </div>
       </section>
+
+ {/* TIMING SCREEN GOES HERE */}
+
+      <section className="timingOnly timingScreenPage">
+
+        <div className="timingScreenHeader">
+          <div>
+            <span>
+              LIVE TIMING
+            </span>
+
+            <h2>
+              RC-RESULTS
+            </h2>
+          </div>
+
+          <div className="timingLiveStatus">
+            <span />
+            LIVE
+          </div>
+        </div>
+
+        <div className="timingComingSoon">
+          <strong>
+            TIMING SCREEN
+          </strong>
+
+          <p>
+            Live race timing will appear here.
+          </p>
+        </div>
+
+      </section>
+      
     </main>
   );
 }
