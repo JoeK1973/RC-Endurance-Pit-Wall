@@ -2289,6 +2289,88 @@ main {
    * When the menu is open, show
    * the header action buttons below.
    */
+  .headerRight {
+    position: relative;
 
+    display: flex;
+    align-items: center;
+
+    margin-left: auto;
+
+    flex-shrink: 0;
+  }
+
+  /*
+   * Hide header action buttons on mobile.
+   * The traffic lights remain visible.
+   */
+  .headerActions > button {
+    display: none;
+  }
+
+  /*
+   * Keep traffic lights visible.
+   */
+  .trafficLights {
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  /*
+   * Show the three-dot menu button.
+   */
+  .mobileMenuButton {
+    display: flex;
+
+    position: relative;
+    z-index: 1001;
+  }
+
+  /*
+   * Open mobile menu.
+   */
+  .headerRight.mobileMenuOpen
+  .headerActions {
+    position: absolute;
+
+    top: calc(100% + 8px);
+    right: 0;
+
+    display: grid;
+
+    grid-template-columns: repeat(3, 52px);
+
+    gap: 8px;
+
+    padding: 12px;
+
+    border: 1px solid var(--line);
+    border-radius: 16px;
+
+    background: var(--card);
+
+    box-shadow:
+      0 12px 30px
+      rgba(0, 0, 0, 0.18);
+
+    z-index: 1000;
+  }
+
+  /*
+   * Show the action buttons when menu is open.
+   */
+  .headerRight.mobileMenuOpen
+  .headerActions > button {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 52px;
+    min-width: 52px;
+    height: 52px;
+
+    padding: 0;
+  }
 }
 
