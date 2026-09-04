@@ -44,6 +44,10 @@ type Race = {
 
   duration_seconds: number;
 
+  strategy_average_lap: number;
+strategy_battery_endurance: number;
+strategy_swap_time: number;
+
   stint_target_minutes: number;
   stint_alert_minutes: number;
 
@@ -309,6 +313,21 @@ export default function Home() {
   const [strategyBatteryMinutes, setStrategyBatteryMinutes] = useState(25);
   const [strategySwapSeconds, setStrategySwapSeconds] = useState(30);
 
+  const [
+  strategyLapTimeInput,
+  setStrategyLapTimeInput,
+] = useState("18.0");
+
+const [
+  strategyBatteryMinutesInput,
+  setStrategyBatteryMinutesInput,
+] = useState("20");
+
+const [
+  strategySwapSecondsInput,
+  setStrategySwapSecondsInput,
+] = useState("30");
+
   const [rcResultsUrl, setRcResultsUrl] =
     useState("");
 
@@ -552,6 +571,24 @@ const loadedRace: Race = {
         0
     ),
 
+  strategy_average_lap:
+  Number(
+    raceData.strategy_average_lap ??
+      18
+  ),
+
+strategy_battery_endurance:
+  Number(
+    raceData.strategy_battery_endurance ??
+      20
+  ),
+
+strategy_swap_time:
+  Number(
+    raceData.strategy_swap_time ??
+      30
+  ),
+
   stint_target_minutes:
     Number(
       raceData.stint_target_minutes ??
@@ -627,6 +664,36 @@ const loadedRace: Race = {
       setRace(
         loadedRace
       );
+
+      setStrategyLapTime(
+  loadedRace.strategy_average_lap
+);
+
+setStrategyLapTimeInput(
+  loadedRace.strategy_average_lap.toFixed(
+    1
+  )
+);
+
+setStrategyBatteryMinutes(
+  loadedRace.strategy_battery_endurance
+);
+
+setStrategyBatteryMinutesInput(
+  String(
+    loadedRace.strategy_battery_endurance
+  )
+);
+
+setStrategySwapSeconds(
+  loadedRace.strategy_swap_time
+);
+
+setStrategySwapSecondsInput(
+  String(
+    loadedRace.strategy_swap_time
+  )
+);
 
       setStintTargetMinutes(
   loadedRace.stint_target_minutes
@@ -1241,6 +1308,107 @@ setStrategyRaceMinutes(
       setMessage("");
     };
 
+  const saveStrategyAverageLap =
+    (rawValue: string) => {
+      const value =
+        Number(rawValue);
+
+      if (
+        !Number.isFinite(value) ||
+        value <= 0
+      ) {
+        setStrategyLapTimeInput(
+          strategyLapTime.toFixed(1)
+        );
+
+        return;
+      }
+
+      const rounded =
+        Math.round(value * 10) / 10;
+
+      setStrategyLapTime(
+        rounded
+      );
+
+      setStrategyLapTimeInput(
+        rounded.toFixed(1)
+      );
+
+      void updateRace({
+        strategy_average_lap:
+          rounded,
+      });
+    };
+
+
+  const saveStrategyBatteryEndurance =
+    (rawValue: string) => {
+      const value =
+        Number(rawValue);
+
+      if (
+        !Number.isFinite(value) ||
+        value < 20
+      ) {
+        setStrategyBatteryMinutesInput(
+          String(strategyBatteryMinutes)
+        );
+
+        return;
+      }
+
+      const wholeNumber =
+        Math.floor(value);
+
+      setStrategyBatteryMinutes(
+        wholeNumber
+      );
+
+      setStrategyBatteryMinutesInput(
+        String(wholeNumber)
+      );
+
+      void updateRace({
+        strategy_battery_endurance:
+          wholeNumber,
+      });
+    };
+
+
+  const saveStrategySwapTime =
+    (rawValue: string) => {
+      const value =
+        Number(rawValue);
+
+      if (
+        !Number.isFinite(value) ||
+        value < 0
+      ) {
+        setStrategySwapSecondsInput(
+          String(strategySwapSeconds)
+        );
+
+        return;
+      }
+
+      const wholeNumber =
+        Math.floor(value);
+
+      setStrategySwapSeconds(
+        wholeNumber
+      );
+
+      setStrategySwapSecondsInput(
+        String(wholeNumber)
+      );
+
+      void updateRace({
+        strategy_swap_time:
+          wholeNumber,
+      });
+    };
+  
   /*
    * Start/resume race.
    */
@@ -5396,9 +5564,165 @@ onChange={(event) => {
       <section className="card strategyOnly historySection">
         <div className="titleRow"><span>OPTIMAL STRATEGY SIMULATOR</span><small>Comparison starts at 20 minutes</small></div>
         <div className="strategyInputs">
-          <label>Average lap (s)<input type="number" min="0.1" step="0.001" value={strategyLapTime} onChange={e=>setStrategyLapTime(Math.max(.1,Number(e.target.value)||.1))}/></label>
-          <label>Battery endurance (min)<input type="number" min="20" value={strategyBatteryMinutes} onChange={e=>setStrategyBatteryMinutes(Math.max(20,Number(e.target.value)||20))}/></label>
-          <label>Swap time (s)<input type="number" min="0" value={strategySwapSeconds} onChange={e=>setStrategySwapSeconds(Math.max(0,Number(e.target.value)||0))}/></label>
+<label>
+  Average lap (s)
+
+  <input
+    type="text"
+    inputMode="decimal"
+    value={strategyLapTimeInput}
+    onChange={(event) => {
+      const raw =
+        event.target.value;
+
+      /*
+       * Allow the field to be completely
+       * empty while the user is editing.
+       */
+      if (raw === "") {
+        setStrategyLapTimeInput(
+          ""
+        );
+
+        return;
+      }
+
+      /*
+       * Allow digits and one decimal point.
+       * Maximum one digit after the decimal.
+       */
+      if (
+        !/^\d+(\.\d?)?$/.test(
+          raw
+        )
+      ) {
+        return;
+      }
+
+      setStrategyLapTimeInput(
+        raw
+      );
+    }}
+    onBlur={() => {
+      saveStrategyAverageLap(
+        strategyLapTimeInput
+      );
+    }}
+    onKeyDown={(event) => {
+      if (
+        event.key === "Enter"
+      ) {
+        event.currentTarget.blur();
+      }
+    }}
+  />
+</label>
+
+
+<label>
+  Battery endurance (min)
+
+  <input
+    type="text"
+    inputMode="numeric"
+    value={
+      strategyBatteryMinutesInput
+    }
+    onChange={(event) => {
+      const raw =
+        event.target.value;
+
+      /*
+       * Allow complete deletion while editing.
+       */
+      if (raw === "") {
+        setStrategyBatteryMinutesInput(
+          ""
+        );
+
+        return;
+      }
+
+      /*
+       * Whole numbers only.
+       */
+      if (
+        !/^\d+$/.test(raw)
+      ) {
+        return;
+      }
+
+      setStrategyBatteryMinutesInput(
+        raw
+      );
+    }}
+    onBlur={() => {
+      saveStrategyBatteryEndurance(
+        strategyBatteryMinutesInput
+      );
+    }}
+    onKeyDown={(event) => {
+      if (
+        event.key === "Enter"
+      ) {
+        event.currentTarget.blur();
+      }
+    }}
+  />
+</label>
+
+
+<label>
+  Swap time (s)
+
+  <input
+    type="text"
+    inputMode="numeric"
+    value={
+      strategySwapSecondsInput
+    }
+    onChange={(event) => {
+      const raw =
+        event.target.value;
+
+      /*
+       * Allow complete deletion while editing.
+       */
+      if (raw === "") {
+        setStrategySwapSecondsInput(
+          ""
+        );
+
+        return;
+      }
+
+      /*
+       * Whole numbers only.
+       */
+      if (
+        !/^\d+$/.test(raw)
+      ) {
+        return;
+      }
+
+      setStrategySwapSecondsInput(
+        raw
+      );
+    }}
+    onBlur={() => {
+      saveStrategySwapTime(
+        strategySwapSecondsInput
+      );
+    }}
+    onKeyDown={(event) => {
+      if (
+        event.key === "Enter"
+      ) {
+        event.currentTarget.blur();
+      }
+    }}
+  />
+</label>
         </div>
         {optimalStrategy && <div className="optimalCard"><strong>OPTIMAL: {optimalStrategy.minutes} MINUTES</strong><b>{optimalStrategy.stops} changes · projected {optimalStrategy.laps.toFixed(1)} laps</b></div>}
         <div className="historyTableWrap"><table className="historyTable"><thead><tr><th>Stint length</th><th>Changes</th><th>Swap loss</th><th>Projected laps</th></tr></thead><tbody>{strategyRows.map(row=><tr key={row.minutes}><td>{row.minutes} min</td><td>{row.stops}</td><td>{row.lostLaps.toFixed(2)} laps</td><td>{row.laps.toFixed(1)}</td></tr>)}</tbody></table></div>
