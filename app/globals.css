@@ -1755,112 +1755,125 @@ header {
     width: auto;
   }
 
+  /* ---------------------------------------
+     MOBILE HEADER CONTROLS
+     --------------------------------------- */
+
+  .headerRight {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+
+    gap: 8px;
+
+    margin-left: auto;
+    padding-right: 8px;
+
+    flex-shrink: 0;
+  }
+
 
   /*
-   * Hide the normal desktop icon row.
-   * It becomes a pop-out menu.
+   * Keep the traffic lights visible.
    */
-  .headerActions {
-    display: none;
+  .trafficLights {
+    display: flex;
+    flex-shrink: 0;
+  }
 
+
+  /*
+   * Hide the header action buttons
+   * until the three-dot menu is opened.
+   */
+  .headerActions > button {
+    display: none;
+  }
+
+
+  /*
+   * Three-dot menu button.
+   */
+  .mobileMenuButton {
+    display: grid;
+    place-items: center;
+
+    position: relative;
+    z-index: 1001;
+
+    flex: 0 0 auto;
+
+    width: 44px;
+    height: 44px;
+
+    margin-right: 4px;
+
+    padding: 0;
+
+    font-size: 1.2rem;
+    line-height: 1;
+
+    border: 1px solid var(--line);
+    border-radius: 12px;
+
+    background: var(--card);
+    color: var(--text);
+
+    cursor: pointer;
+  }
+
+
+  /*
+   * Open the header actions as a popup.
+   */
+  .headerRight.mobileMenuOpen
+  .headerActions {
     position: absolute;
 
     top: calc(100% + 8px);
-    right: 10px;
+    right: 0;
 
-    width: min(
-      280px,
-      calc(100vw - 20px)
-    );
+    display: grid;
 
-    padding: 10px;
+    grid-template-columns:
+      repeat(3, 52px);
 
-    flex-direction: column;
-    align-items: stretch;
+    gap: 8px;
 
-    background: var(--card);
+    padding: 12px;
 
     border: 1px solid var(--line);
     border-radius: 16px;
 
+    background: var(--card);
+
     box-shadow:
-      0 18px 45px
-      rgba(0, 0, 0, 0.22);
+      0 12px 30px
+      rgba(0, 0, 0, 0.18);
+
+    z-index: 1000;
   }
 
 
-  .headerActions.mobileMenuOpen {
+  /*
+   * Show the action buttons when
+   * the popup is open.
+   */
+  .headerRight.mobileMenuOpen
+  .headerActions > button {
     display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 52px;
+    min-width: 52px;
+    height: 52px;
+
+    padding: 0;
   }
-
-
-  /*
-   * Turn each existing header icon
-   * into a full-width touch target.
-   */
-  .headerActions .icon,
-  .headerActions .leaveIconButton {
-    width: 100%;
-    min-height: 48px;
-
-    justify-content: flex-start;
-
-    border-radius: 10px;
-  }
-
-
-  /*
-   * Keep the traffic lights visible
-   * at the top of the menu.
-   */
-  .headerActions .trafficLights {
-    margin: 4px auto 12px;
-  }
-
-
-  /* ---------------------------------------
-     MOBILE MENU BUTTON
-     --------------------------------------- */
-
-.mobileMenuButton {
-  display: grid;
-  place-items: center;
-
-  flex: 0 0 auto;
-
-  width: 44px;
-  height: 44px;
-
-  margin-right: 4px;
-
-  padding: 0;
-
-  font-size: 1.2rem;
-  line-height: 1;
-
-  border: 1px solid var(--line);
-  border-radius: 12px;
-
-  background: var(--card);
-  color: var(--text);
-
-  cursor: pointer;
-}
-
-
-  /*
-   * Keep messages usable without
-   * taking over the whole header.
-   */
-.headerRight {
-  display: flex;
-  align-items: center;
-
-  gap: 10px;
-
-  padding-right: 8px;
-}
-
+  
 
   .headerMessage {
     position: fixed;
