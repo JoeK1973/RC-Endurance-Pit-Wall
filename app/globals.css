@@ -2133,3 +2133,80 @@ main {
   }
 
 }
+
+/* =========================================================
+   HEADER ACTIONS + TRAFFIC LIGHTS
+   ========================================================= */
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Traffic light container */
+
+.trafficLights {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+
+  width: 34px;
+  height: 48px;
+
+  padding: 6px;
+
+  border: 1px solid var(--line);
+  border-radius: 10px;
+
+  background: var(--card);
+}
+
+/* Individual lights */
+
+.trafficLight {
+  display: block;
+
+  width: 100%;
+  aspect-ratio: 1;
+
+  border-radius: 50%;
+
+  background: var(--line);
+
+  opacity: 0.3;
+}
+
+/* Idle = red */
+
+.trafficLights.idle .red {
+  background: #e53935;
+  opacity: 1;
+}
+
+/* Paused = red + amber */
+
+.trafficLights.paused .red {
+  background: #e53935;
+  opacity: 1;
+}
+
+.trafficLights.paused .amber {
+  background: #f9a825;
+  opacity: 1;
+}
+
+/* Running = green */
+
+.trafficLights.running .green {
+  background: #20a05a;
+  opacity: 1;
+}
