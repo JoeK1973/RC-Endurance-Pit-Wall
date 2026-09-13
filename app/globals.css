@@ -1064,7 +1064,7 @@ li button {
 
 
 /* ===== Tabbed dashboard ===== */
-.appTabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 18px}.appTab{color:#fff;border:0;min-height:48px}.raceTab{background:#7c3aed}.teamTab{background:#0f766e}.analysisTab{background:#2563eb}.strategyTab{background:#c2410c}.appTab.active{outline:3px solid rgba(255,255,255,.45);transform:translateY(-1px)}
+.appTabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 18px}.appTab{color:#fff;border:0;min-height:48px}.raceTab{background:#7c3aed}.teamTab{background:#0f766e}.analysisTab{background:#2563eb}.strategyTab{background:#c2410c}.timingTab{background:#dc2626}.appTab.active{outline:3px solid rgba(255,255,255,.45);transform:translateY(-1px)}
 [data-tab="race"] .teamOnly,[data-tab="race"] .analysisOnly,[data-tab="race"] .strategyOnly{display:none!important}[data-tab="team"] .racePanel,[data-tab="team"] .analysisOnly,[data-tab="team"] .strategyOnly{display:none!important}[data-tab="analysis"] .racePanel,[data-tab="analysis"] .teamOnly,[data-tab="analysis"] .strategyOnly{display:none!important}[data-tab="strategy"] .racePanel,[data-tab="strategy"] .teamOnly,[data-tab="strategy"] .analysisOnly{display:none!important}
 .racePanel{display:block}.racePanel>.hero{margin-bottom:16px}.stintWarning{margin-top:14px;padding:12px;border-radius:10px;background:#f59e0b;color:#1f2937;font-weight:800;animation:pulseWarning 1.2s infinite}@keyframes pulseWarning{50%{transform:scale(1.01);filter:brightness(1.08)}}
 .changeButton{background:#2563eb;color:#fff;border-color:#2563eb}.startButton{background:#16a34a;color:#fff;border-color:#16a34a}.pauseButton{background:#dc2626;color:#fff;border-color:#dc2626}.resetButton{background:#f59e0b;color:#1f2937;border-color:#f59e0b}
@@ -3407,26 +3407,5 @@ main {
 
 }
 
-/* TIMING tab - readable in both light and dark themes */
-.tabButton.timingOnly {
-  background: #c2410c;
-  color: #ffffff;
-  border-color: #c2410c;
-}
 
-.tabButton.timingOnly:hover {
-  background: #ea580c;
-  color: #ffffff;
-}
-
-[data-theme="dark"] .tabButton.timingOnly {
-  background: #f97316;
-  color: #111827;
-  border-color: #f97316;
-}
-
-[data-theme="dark"] .tabButton.timingOnly:hover {
-  background: #fb923c;
-  color: #111827;
-}
 
