@@ -3407,3 +3407,26 @@ main {
 
 }
 
+/* TIMING tab - readable in both light and dark themes */
+.tabButton.timingOnly {
+  background: #c2410c;
+  color: #ffffff;
+  border-color: #c2410c;
+}
+
+.tabButton.timingOnly:hover {
+  background: #ea580c;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .tabButton.timingOnly {
+  background: #f97316;
+  color: #111827;
+  border-color: #f97316;
+}
+
+[data-theme="dark"] .tabButton.timingOnly:hover {
+  background: #fb923c;
+  color: #111827;
+}
+
