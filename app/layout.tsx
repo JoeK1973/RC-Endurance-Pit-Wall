@@ -1,25 +1,12 @@
-import type {
-  Metadata,
-  Viewport,
-} from "next";
-
+import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RC Endurance",
-  description: "RC endurance race dashboard",
+  title: "RC Endurance Pit Wall",
+  description: "Race-day pit wall and endurance strategy control system.",
 };
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <body>{children}</body>
