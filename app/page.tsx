@@ -12,8 +12,9 @@ import { QRCodeSVG } from "qrcode.react";
 import * as XLSX from "xlsx";
 import {
   createClient,
-  hasSupabase,
-} from "@/lib/supabase/client";
+  hasFirebase,
+  type FirebaseRealtimeChange,
+} from "@/lib/firebase/client";
 
 type Driver = {
   id: string;
@@ -121,6 +122,8 @@ type DriverStint = {
   ended_at: string | null;
   start_lap: number;
   end_lap: number | null;
+  pause_seconds_at_start?: number;
+  pause_seconds_at_end?: number;
 };
 
 type RaceEvent = {
@@ -244,7 +247,7 @@ const secondsSince = (
 };
 
 export default function Home() {
-  const supabase = useRef<any>(null);
+  const firebase = useRef<any>(null);
 
   const [session, setSession] =
     useState<Session | null>(null);
@@ -402,11 +405,11 @@ useEffect(() => {
   useState(false);
 
   /*
-   * Initialise Supabase.
+   * Initialise Firebase.
    */
   useEffect(() => {
-    if (hasSupabase()) {
-      supabase.current =
+    if (hasFirebase()) {
+      firebase.current =
         createClient();
     }
   }, []);
@@ -441,11 +444,11 @@ useEffect(() => {
   const loadSession = useCallback(
     async (code: string) => {
       const db =
-        supabase.current;
+        firebase.current;
 
       if (!db) {
         setMessage(
-          "Supabase is not configured."
+          "Firebase is not configured."
         );
         return;
       }
@@ -507,12 +510,6 @@ useEffect(() => {
           .eq(
             "session_id",
             sessionData.id
-          )
-          .order(
-            "created_at",
-            {
-              ascending: true,
-            }
           ),
 
         db
@@ -523,12 +520,6 @@ useEffect(() => {
           .eq(
             "session_id",
             sessionData.id
-          )
-          .order(
-            "position",
-            {
-              ascending: true,
-            }
           ),
 
         db
@@ -754,11 +745,19 @@ setStrategyRaceMinutes(
 );
 
       setDrivers(
-        driverResult.data ?? []
+        [...(driverResult.data ?? [])].sort((a, b) =>
+          String(a.created_at ?? "").localeCompare(
+            String(b.created_at ?? "")
+          )
+        )
       );
 
+      // Keep queue order without relying on a Firestore composite index.
+      // This is important when a session is reloaded after a browser refresh.
       setQueue(
-        queueResult.data ?? []
+        [...(queueResult.data ?? [])].sort(
+          (a, b) => Number(a.position) - Number(b.position)
+        )
       );
 
       setLiveResultsConfig(
@@ -808,7 +807,7 @@ setStrategyRaceMinutes(
    * Load shared session.
    */
   useEffect(() => {
-    if (!supabase.current) {
+    if (!firebase.current) {
       return;
     }
 
@@ -828,82 +827,156 @@ setStrategyRaceMinutes(
   }, [loadSession]);
 
   /*
-   * Supabase realtime updates.
+   * Firebase realtime updates.
    */
   useEffect(() => {
     if (!session) return;
 
     const db =
-      supabase.current;
+      firebase.current;
 
     if (!db) return;
 
     const sessionId =
       session.id;
 
-    const sessionCode =
-      session.session_code;
+    const applyChanges = (changes: FirebaseRealtimeChange[]) => {
+      for (const change of changes) {
+        const row = {
+          id: change.id,
+          ...change.data,
+        };
 
-    const refresh = () => {
-      void loadSession(
-        sessionCode
-      );
+        if (change.table === "races") {
+          // Update only the race document. Do not reload the whole session:
+          // race state changes happen frequently during a live race.
+          setRace(row as Race);
+          continue;
+        }
+
+        if (change.table === "drivers") {
+          setDrivers((current) => {
+            if (change.type === "removed") {
+              return current.filter((item) => item.id !== change.id);
+            }
+            const driver = row as Driver;
+            const index = current.findIndex((item) => item.id === change.id);
+            if (index === -1) return [...current, driver];
+            const next = [...current];
+            next[index] = driver;
+            return next.sort((a, b) =>
+              String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""))
+            );
+          });
+          continue;
+        }
+
+        if (change.table === "driver_queue") {
+          setQueue((current) => {
+            if (change.type === "removed") {
+              return current.filter((item) => item.id !== change.id);
+            }
+            const queueItem = row as QueueItem;
+            const index = current.findIndex((item) => item.id === change.id);
+            const next =
+              index === -1
+                ? [...current, queueItem]
+                : current.map((item, itemIndex) =>
+                    itemIndex === index ? queueItem : item
+                  );
+            return next.sort((a, b) => Number(a.position) - Number(b.position));
+          });
+          continue;
+        }
+
+        if (change.table === "race_laps") {
+          setRaceLaps((current) => {
+            if (change.type === "removed") {
+              return current.filter((item) => item.id !== change.id);
+            }
+            const lap = row as RaceLap;
+            const index = current.findIndex((item) => item.id === change.id);
+            if (index === -1) {
+              return [...current, lap].sort((a, b) => a.lap_number - b.lap_number);
+            }
+            const next = [...current];
+            next[index] = lap;
+            return next.sort((a, b) => a.lap_number - b.lap_number);
+          });
+          continue;
+        }
+
+        if (change.table === "driver_stints") {
+          setStints((current) => {
+            if (change.type === "removed") return current.filter((item) => item.id !== change.id);
+            const stintItem = row as DriverStint;
+            const index = current.findIndex((item) => item.id === change.id);
+            const next = index === -1
+              ? [...current, stintItem]
+              : current.map((item, itemIndex) => itemIndex === index ? stintItem : item);
+            return next.sort((a, b) => String(b.started_at).localeCompare(String(a.started_at)));
+          });
+          continue;
+        }
+
+        if (change.table === "race_events") {
+          setRaceEvents((current) => {
+            if (change.type === "removed") return current.filter((item) => item.id !== change.id);
+            const event = row as RaceEvent;
+            const index = current.findIndex((item) => item.id === change.id);
+            const next = index === -1
+              ? [...current, event]
+              : current.map((item, itemIndex) => itemIndex === index ? event : item);
+            return next.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+          });
+          continue;
+        }
+
+        if (change.table === "live_results_config") {
+          setLiveResultsConfig(
+            change.type === "removed" ? null : (row as LiveResultsConfig)
+          );
+          continue;
+        }
+      }
     };
 
     const channel = db
-      .channel(
-        `race-session-${sessionId}`
+      .channel(`race-session-${sessionId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "races", filter: `session_id=eq.${sessionId}` },
+        applyChanges
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "races",
-          filter: `session_id=eq.${sessionId}`,
-        },
-        refresh
+        { event: "*", schema: "public", table: "drivers", filter: `session_id=eq.${sessionId}` },
+        applyChanges
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "drivers",
-          filter: `session_id=eq.${sessionId}`,
-        },
-        refresh
+        { event: "*", schema: "public", table: "driver_queue", filter: `session_id=eq.${sessionId}` },
+        applyChanges
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "driver_queue",
-          filter: `session_id=eq.${sessionId}`,
-        },
-        refresh
+        { event: "*", schema: "public", table: "live_results_config", filter: `session_id=eq.${sessionId}` },
+        applyChanges
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table:
-            "live_results_config",
-          filter: `session_id=eq.${sessionId}`,
-        },
-        refresh
+        { event: "*", schema: "public", table: "race_laps", filter: `session_id=eq.${sessionId}` },
+        applyChanges
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "race_laps",
-          filter: `session_id=eq.${sessionId}`,
-        },
-        refresh
+        { event: "*", schema: "public", table: "driver_stints", filter: `session_id=eq.${sessionId}` },
+        applyChanges
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "race_events", filter: `session_id=eq.${sessionId}` },
+        applyChanges
       )
       .subscribe();
 
@@ -912,7 +985,7 @@ setStrategyRaceMinutes(
         channel
       );
     };
-  }, [session, loadSession]);
+  }, [session]);
 
   /*
    * Create a new session.
@@ -920,11 +993,11 @@ setStrategyRaceMinutes(
   const createSession =
     async () => {
       const db =
-        supabase.current;
+        firebase.current;
 
       if (!db) {
         setMessage(
-          "Supabase is not configured."
+          "Firebase is not configured."
         );
         return;
       }
@@ -968,7 +1041,7 @@ setStrategyRaceMinutes(
       const currentSession = session;
       const currentRace = race;
       const driverName = newDriver.trim();
-      const db = supabase.current;
+      const db = firebase.current;
 
       if (!currentSession) {
         setMessage(
@@ -986,7 +1059,7 @@ setStrategyRaceMinutes(
 
       if (!db) {
         setMessage(
-          "Supabase is not configured."
+          "Firebase is not configured."
         );
         return;
       }
@@ -1025,7 +1098,7 @@ setStrategyRaceMinutes(
         return;
       }
 
-      // Update immediately; do not depend on Supabase Realtime.
+      // Update immediately; do not depend on Firebase realtime.
       setDrivers(
         (currentDrivers) =>
           currentDrivers.some(
@@ -1140,7 +1213,7 @@ setStrategyRaceMinutes(
       }
 
       const db =
-        supabase.current;
+        firebase.current;
 
       if (!db) return;
 
@@ -1173,7 +1246,7 @@ setStrategyRaceMinutes(
       driverId: string
     ) => {
       const currentSession = session;
-      const db = supabase.current;
+      const db = firebase.current;
 
       if (!currentSession) {
         setMessage(
@@ -1183,7 +1256,7 @@ setStrategyRaceMinutes(
       }
 
       if (!db) {
-        setMessage("Supabase is not configured.");
+        setMessage("Firebase is not configured.");
         return;
       }
 
@@ -1227,18 +1300,9 @@ setStrategyRaceMinutes(
 
       setMessage("");
 
-      // Update immediately without depending on Realtime.
-      setQueue(
-        (currentQueue) =>
-          [
-            ...currentQueue,
-            data as QueueItem,
-          ].sort(
-            (a, b) =>
-              Number(a.position) -
-              Number(b.position)
-          )
-      );
+      // Firestore realtime is the single source of truth for queue changes.
+      // Do not also append locally here: the write generates an `added`
+      // realtime event, and doing both would display the same queue item twice.
     };
 
   /*
@@ -1249,10 +1313,10 @@ setStrategyRaceMinutes(
     async (
       queueItemId: string
     ) => {
-      const db = supabase.current;
+      const db = firebase.current;
 
       if (!db) {
-        setMessage("Supabase is not configured.");
+        setMessage("Firebase is not configured.");
         return;
       }
 
@@ -1297,7 +1361,7 @@ setStrategyRaceMinutes(
       }
 
       const db =
-        supabase.current;
+        firebase.current;
 
       if (!db) return;
 
@@ -1319,7 +1383,7 @@ setStrategyRaceMinutes(
 
       /*
        * Update local state immediately so Start/Pause/Reset take
-       * effect without waiting for a Supabase reload or Realtime event.
+       * effect without waiting for a Firebase reload or Realtime event.
        */
       setRace({
         ...currentRace,
@@ -1581,7 +1645,7 @@ setStrategyRaceMinutes(
         race;
 
       const db =
-        supabase.current;
+        firebase.current;
 
       if (
         !currentSession ||
@@ -1833,7 +1897,7 @@ setStrategyRaceMinutes(
         race;
 
       const db =
-        supabase.current;
+        firebase.current;
 
       if (
         !currentSession ||
@@ -2052,18 +2116,23 @@ setStrategyRaceMinutes(
       }
 
       const db =
-        supabase.current;
+        firebase.current;
 
       if (!db) return;
+
+      const endedAt = new Date().toISOString();
+      const pausedNow =
+        currentRace.status === "paused" && currentRace.paused_at
+          ? Math.max(0, Math.floor((Date.now() - new Date(currentRace.paused_at).getTime()) / 1000))
+          : 0;
 
       await db
         .from("driver_stints")
         .update({
-          ended_at:
-            new Date().toISOString(),
-
-          end_lap:
-            raceLaps.length,
+          ended_at: endedAt,
+          end_lap: raceLaps.length,
+          pause_seconds_at_end:
+            Number(currentRace.accumulated_pause_seconds ?? 0) + pausedNow,
         })
         .eq(
           "id",
@@ -2092,7 +2161,7 @@ setStrategyRaceMinutes(
       }
 
       const db =
-        supabase.current;
+        firebase.current;
 
       if (!db) return;
 
@@ -2116,6 +2185,9 @@ setStrategyRaceMinutes(
 
           start_lap:
             raceLaps.length,
+
+          pause_seconds_at_start:
+            Number(currentRace.accumulated_pause_seconds ?? 0),
         })
         .select()
         .single();
@@ -2153,7 +2225,7 @@ setStrategyRaceMinutes(
   /*
    * Battery swap, driver swap or both.
    *
-   * This function updates Supabase and the local UI state separately.
+   * This function updates Firebase and the local UI state separately.
    * It intentionally does not change the timer, live tracking, drivers
    * list or queue add/remove functions.
    */
@@ -2166,7 +2238,7 @@ setStrategyRaceMinutes(
     ) => {
       const currentSession = session;
       const currentRace = race;
-      const db = supabase.current;
+      const db = firebase.current;
 
       if (!currentSession || !currentRace) {
         setMessage(
@@ -2176,7 +2248,7 @@ setStrategyRaceMinutes(
       }
 
       if (!db) {
-        setMessage("Supabase is not configured.");
+        setMessage("Firebase is not configured.");
         return;
       }
 
@@ -2279,18 +2351,27 @@ setStrategyRaceMinutes(
             ]
           : [firstQueueItem.id];
 
-      const { error: deleteError } =
-        await db
+      /*
+       * Delete the exact queue documents by document ID.
+       *
+       * Do not use a Firestore `where id in (...)` query here: `id` is the
+       * Firestore document ID, not a stored field. More importantly, a
+       * collection query filtered only by document ID cannot be authorised
+       * by our session-membership rules, which is why Driver/Full Change
+       * previously returned "Missing or insufficient permissions" while a
+       * Battery Swap worked. Direct document deletes are both cheaper and
+       * correctly covered by the driver_queue security rule.
+       */
+      for (const queueItemId of queueItemsToRemove) {
+        const { error: deleteError } = await db
           .from("driver_queue")
           .delete()
-          .in(
-            "id",
-            queueItemsToRemove
-          );
+          .eq("id", queueItemId);
 
-      if (deleteError) {
-        setMessage(deleteError.message);
-        return;
+        if (deleteError) {
+          setMessage(deleteError.message);
+          return;
+        }
       }
 
       /*
@@ -2306,6 +2387,8 @@ setStrategyRaceMinutes(
           driver_id: incomingDriverId,
           started_at: nowIso,
           start_lap: raceLaps.length,
+          pause_seconds_at_start:
+            Number(currentRace.accumulated_pause_seconds ?? 0),
         })
         .select()
         .single();
@@ -2360,7 +2443,7 @@ setStrategyRaceMinutes(
       /*
        * Update the queue and race immediately. This is what makes
        * Current Driver and Activity Tracker change without waiting
-       * for Supabase Realtime.
+       * for Firebase realtime.
        */
       setQueue(
         (currentQueue) =>
@@ -2513,7 +2596,7 @@ setStrategyRaceMinutes(
       }
 
       const db =
-        supabase.current;
+        firebase.current;
 
       if (!db) return;
 
@@ -2576,7 +2659,7 @@ setStrategyRaceMinutes(
       }
 
       const db =
-        supabase.current;
+        firebase.current;
 
       if (!db) return;
 
@@ -2616,7 +2699,7 @@ setStrategyRaceMinutes(
   /*
    * Poll RC-Results and store completed laps.
    *
-   * This version does not depend on a Supabase unique
+   * This version does not depend on a Firestore unique
    * constraint for upsert(). It filters out laps already
    * known locally, then inserts only genuinely new laps.
    */
@@ -2633,7 +2716,7 @@ setStrategyRaceMinutes(
           race;
 
         const db =
-          supabase.current;
+          firebase.current;
 
         if (
           !currentConfig?.enabled ||
@@ -3059,32 +3142,39 @@ if (
    */
   const refreshHistory =
     useCallback(async () => {
-      const db = supabase.current;
+      const db = firebase.current;
       const currentSession = session;
 
       if (!db || !currentSession) return;
 
-      const [
-        { data: stintData },
-        { data: eventData },
-      ] = await Promise.all([
+      const [stintResult, eventResult] = await Promise.all([
         db
           .from("driver_stints")
           .select("*")
-          .eq("session_id", currentSession.id)
-          .order("started_at", { ascending: false }),
+          .eq("session_id", currentSession.id),
         db
           .from("race_events")
           .select("*")
-          .eq("session_id", currentSession.id)
-          .order("created_at", { ascending: false }),
+          .eq("session_id", currentSession.id),
       ]);
 
+      if (stintResult.error) {
+        console.error("Could not load stint history:", stintResult.error);
+      }
+      if (eventResult.error) {
+        console.error("Could not load rotation history:", eventResult.error);
+      }
+
       setStints(
-        (stintData ?? []) as DriverStint[]
+        [...((stintResult.data ?? []) as DriverStint[])].sort((a, b) =>
+          String(b.started_at).localeCompare(String(a.started_at))
+        )
       );
+
       setRaceEvents(
-        (eventData ?? []) as RaceEvent[]
+        [...((eventResult.data ?? []) as RaceEvent[])].sort((a, b) =>
+          String(b.created_at).localeCompare(String(a.created_at))
+        )
       );
     }, [session]);
 
@@ -3447,44 +3537,29 @@ if (
   const driverLoad = useMemo(
     () =>
       drivers.map((driver) => {
-        const totalSeconds =
-          stints
-            .filter(
-              (stintItem) =>
-                stintItem.driver_id === driver.id
-            )
-            .reduce(
-              (total, stintItem) => {
-                const end =
-                  stintItem.ended_at
-                    ? new Date(
-                        stintItem.ended_at
-                      ).getTime()
-                    : Date.now();
+        const totalSeconds = stints
+          .filter((stintItem) => stintItem.driver_id === driver.id)
+          .reduce((total, stintItem) => {
+            const startMs = new Date(stintItem.started_at).getTime();
+            const endMs = stintItem.ended_at ? new Date(stintItem.ended_at).getTime() : now;
 
-                return (
-                  total +
-                  Math.max(
-                    0,
-                    Math.floor(
-                      (end -
-                        new Date(
-                          stintItem.started_at
-                        ).getTime()) /
-                        1000
-                    )
-                  )
-                );
-              },
-              0
-            );
+            if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return total;
 
-        return {
-          driver,
-          totalSeconds,
-        };
+            const wallSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
+            const pauseAtStart = Number(stintItem.pause_seconds_at_start ?? 0);
+            const pauseAtEnd = stintItem.ended_at
+              ? Number(stintItem.pause_seconds_at_end ?? pauseAtStart)
+              : Number(race?.accumulated_pause_seconds ?? 0) +
+                (race?.status === "paused" && race.paused_at
+                  ? Math.max(0, Math.floor((now - new Date(race.paused_at).getTime()) / 1000))
+                  : 0);
+
+            return total + Math.max(0, wallSeconds - Math.max(0, pauseAtEnd - pauseAtStart));
+          }, 0);
+
+        return { driver, totalSeconds };
       }),
-    [drivers, stints]
+    [drivers, stints, now, race]
   );
 
   const stintRemaining = Math.max(0, stintTargetMinutes * 60 - stint);
@@ -3657,8 +3732,8 @@ if (
           )}
 
           <p className="muted">
-            Supabase:{" "}
-            {hasSupabase()
+            Firebase:{" "}
+            {hasFirebase()
               ? "configured"
               : "not configured"}
           </p>

@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(sessionId) {
+      return signedIn() && exists(
+        /databases/$(database)/documents/sessions/$(sessionId)/members/$(request.auth.uid)
+      );
+    }
+
+    match /sessionCodes/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.session_code == code;
+      allow update, delete: if false;
+    }
+
+    match /sessions/{sessionId} {
+      // Session metadata is needed to complete a session-code join.
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.owner_uid == request.auth.uid;
+      allow update, delete: if signedIn()
+        && resource.data.owner_uid == request.auth.uid;
+
+      match /members/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || isMember(sessionId));
+        allow create: if signedIn()
+          && request.auth.uid == uid
+          && exists(/databases/$(database)/documents/sessions/$(sessionId))
+          && request.resource.data.sessionCode == get(/databases/$(database)/documents/sessions/$(sessionId)).data.session_code;
+        allow update, delete: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    match /races/{raceId} {
+      allow read: if isMember(resource.data.session_id);
+      allow create: if signedIn()
+        && exists(/databases/$(database)/documents/sessions/$(request.resource.data.session_id))
+        && get(/databases/$(database)/documents/sessions/$(request.resource.data.session_id)).data.owner_uid == request.auth.uid;
+      allow update, delete: if isMember(resource.data.session_id);
+    }
+
+    match /drivers/{id} {
+      allow read: if isMember(resource.data.session_id);
+      allow create: if isMember(request.resource.data.session_id);
+      allow update, delete: if isMember(resource.data.session_id);
+    }
+
+    match /driver_queue/{id} {
+      allow read: if isMember(resource.data.session_id);
+      allow create: if isMember(request.resource.data.session_id);
+      allow update, delete: if isMember(resource.data.session_id);
+    }
+
+    match /live_results_config/{id} {
+      allow read: if isMember(resource.data.session_id);
+      allow create: if isMember(request.resource.data.session_id);
+      allow update, delete: if isMember(resource.data.session_id);
+    }
+
+    match /race_laps/{id} {
+      allow read: if isMember(resource.data.session_id);
+      allow create: if isMember(request.resource.data.session_id);
+      allow update, delete: if isMember(resource.data.session_id);
+    }
+
+    match /driver_stints/{id} {
+      allow read: if isMember(resource.data.session_id);
+      allow create: if isMember(request.resource.data.session_id);
+      allow update, delete: if isMember(resource.data.session_id);
+    }
+
+    match /race_events/{id} {
+      allow read: if isMember(resource.data.session_id);
+      allow create: if isMember(request.resource.data.session_id);
+      allow update, delete: if isMember(resource.data.session_id);
+    }
+  }
+}
