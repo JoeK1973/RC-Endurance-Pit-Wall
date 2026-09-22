@@ -1115,84 +1115,74 @@ setStrategyRaceMinutes(
       setNewDriver("");
 
       /*
-       * Only assign the first driver to the race when the race
-       * row is available. Saving the driver does not depend on it.
+       * Assign the first driver to the race, but do not start their
+       * stint until the race clock is actually running.
        */
       if (
         currentRace &&
         !currentRace.current_driver_id
       ) {
-        const nowIso =
-          new Date().toISOString();
+        if (currentRace.status === "running") {
+          const nowIso = new Date().toISOString();
+          const { data: newStint, error: stintError } = await db
+            .from("driver_stints")
+            .insert({
+              session_id: currentSession.id,
+              driver_id: data.id,
+              started_at: nowIso,
+              start_lap: raceLaps.length,
+              pause_seconds_at_start: Number(currentRace.accumulated_pause_seconds ?? 0),
+            })
+            .select()
+            .single();
 
-        const {
-          data: newStint,
-          error: stintError,
-        } = await db
-          .from("driver_stints")
-          .insert({
-            session_id:
-              currentSession.id,
-            driver_id:
-              data.id,
-            started_at:
-              nowIso,
-            start_lap:
-              raceLaps.length,
-          })
-          .select()
-          .single();
+          if (stintError || !newStint) {
+            setMessage(`Driver saved, but the first stint could not be created: ${stintError?.message ?? "Unknown error"}`);
+            return;
+          }
 
-        if (stintError) {
-          console.error(
-            "Could not create first stint:",
-            stintError
-          );
-          setMessage(
-            `Driver saved, but the first stint could not be created: ${stintError.message}`
-          );
-          return;
+          const { error: raceError } = await db
+            .from("races")
+            .update({
+              current_driver_id: data.id,
+              current_stint_started_at: nowIso,
+              active_stint_id: newStint.id,
+            })
+            .eq("id", currentRace.id);
+
+          if (raceError) {
+            setMessage(`Driver saved, but could not set them as the current driver: ${raceError.message}`);
+            return;
+          }
+
+          setRace({
+            ...currentRace,
+            current_driver_id: data.id,
+            current_stint_started_at: nowIso,
+            active_stint_id: newStint.id,
+          });
+        } else {
+          const { error: raceError } = await db
+            .from("races")
+            .update({
+              current_driver_id: data.id,
+              current_stint_started_at: null,
+              active_stint_id: null,
+            })
+            .eq("id", currentRace.id);
+
+          if (raceError) {
+            setMessage(`Driver saved, but could not set them as the current driver: ${raceError.message}`);
+            return;
+          }
+
+          setRace({
+            ...currentRace,
+            current_driver_id: data.id,
+            current_stint_started_at: null,
+            active_stint_id: null,
+          });
         }
-
-        const {
-          error: raceError,
-        } = await db
-          .from("races")
-          .update({
-            current_driver_id:
-              data.id,
-            current_stint_started_at:
-              nowIso,
-            active_stint_id:
-              newStint?.id ??
-              null,
-          })
-          .eq(
-            "id",
-            currentRace.id
-          );
-
-        if (raceError) {
-          console.error(
-            "Could not set current driver:",
-            raceError
-          );
-          setMessage(
-            `Driver saved, but could not set them as the current driver: ${raceError.message}`
-          );
-          return;
-        }
-
-        setRace({
-          ...currentRace,
-          current_driver_id:
-            data.id,
-          current_stint_started_at:
-            nowIso,
-          active_stint_id:
-            newStint?.id ??
-            null,
-        });
       }
     };
 
@@ -1513,15 +1503,44 @@ setStrategyRaceMinutes(
         currentRace.status ===
         "idle"
       ) {
+        const db = firebase.current;
+
+        if (!db) {
+          setMessage("Firebase is not configured.");
+          return;
+        }
+
+        let activeStintId: string | null = null;
+
+        /* The first driver stint starts at exactly the same moment as the race clock. */
+        if (currentRace.current_driver_id) {
+          const { data: newStint, error: stintError } = await db
+            .from("driver_stints")
+            .insert({
+              session_id: currentRace.session_id,
+              driver_id: currentRace.current_driver_id,
+              started_at: nowIso,
+              start_lap: raceLaps.length,
+              pause_seconds_at_start: 0,
+            })
+            .select()
+            .single();
+
+          if (stintError || !newStint) {
+            setMessage(stintError?.message ?? "Could not start the first driver stint.");
+            return;
+          }
+
+          activeStintId = newStint.id;
+        }
+
         await updateRace({
           status: "running",
           started_at: nowIso,
           paused_at: null,
-          accumulated_pause_seconds:
-            0,
-          current_stint_started_at:
-            currentRace.current_stint_started_at ??
-            nowIso,
+          accumulated_pause_seconds: 0,
+          current_stint_started_at: currentRace.current_driver_id ? nowIso : null,
+          active_stint_id: activeStintId,
         });
 
         return;
@@ -1544,12 +1563,44 @@ setStrategyRaceMinutes(
             )
           );
 
+        let activeStintId = currentRace.active_stint_id;
+        let currentStintStartedAt = currentRace.current_stint_started_at;
+
+        /* If a driver was selected while paused, start their stint on resume. */
+        if (currentRace.current_driver_id && !activeStintId) {
+          const db = firebase.current;
+          if (!db) {
+            setMessage("Firebase is not configured.");
+            return;
+          }
+
+          const { data: newStint, error: stintError } = await db
+            .from("driver_stints")
+            .insert({
+              session_id: currentRace.session_id,
+              driver_id: currentRace.current_driver_id,
+              started_at: nowIso,
+              start_lap: raceLaps.length,
+              pause_seconds_at_start: currentRace.accumulated_pause_seconds + pausedFor,
+            })
+            .select()
+            .single();
+
+          if (stintError || !newStint) {
+            setMessage(stintError?.message ?? "Could not start the driver stint.");
+            return;
+          }
+
+          activeStintId = newStint.id;
+          currentStintStartedAt = nowIso;
+        }
+
         await updateRace({
           status: "running",
           paused_at: null,
-          accumulated_pause_seconds:
-            currentRace.accumulated_pause_seconds +
-            pausedFor,
+          accumulated_pause_seconds: currentRace.accumulated_pause_seconds + pausedFor,
+          current_stint_started_at: currentStintStartedAt,
+          active_stint_id: activeStintId,
         });
       }
     };
@@ -2165,6 +2216,27 @@ setStrategyRaceMinutes(
 
       if (!db) return;
 
+      /* Selecting a driver while idle/paused does not start a timed stint. */
+      if (currentRace.status !== "running") {
+        await db
+          .from("races")
+          .update({
+            current_driver_id: driverId,
+            current_stint_started_at: null,
+            active_stint_id: null,
+          })
+          .eq("id", currentRace.id);
+
+        setRace({
+          ...currentRace,
+          current_driver_id: driverId,
+          current_stint_started_at: null,
+          active_stint_id: null,
+        });
+
+        return;
+      }
+
       const nowIso =
         new Date().toISOString();
 
@@ -2259,6 +2331,11 @@ setStrategyRaceMinutes(
        * the same driver, queue and activity rotation.
        */
       if (type === "battery_swap") {
+        if (currentRace.status !== "running") {
+          setMessage("Race has not started yet.");
+          return;
+        }
+
         const nowIso = new Date().toISOString();
 
         const { error } = await db
@@ -3317,8 +3394,11 @@ if (
    * Current stint duration.
    */
   const stint = useMemo(() => {
+    /* A stint must never run before the race clock. */
     if (
-      !race?.current_stint_started_at
+      !race ||
+      race.status === "idle" ||
+      !race.current_stint_started_at
     ) {
       return 0;
     }
@@ -3541,7 +3621,11 @@ if (
           .filter((stintItem) => stintItem.driver_id === driver.id)
           .reduce((total, stintItem) => {
             const startMs = new Date(stintItem.started_at).getTime();
-            const endMs = stintItem.ended_at ? new Date(stintItem.ended_at).getTime() : now;
+            const endMs = stintItem.ended_at
+              ? new Date(stintItem.ended_at).getTime()
+              : race?.status === "running"
+                ? now
+                : new Date(stintItem.started_at).getTime();
 
             if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return total;
 
